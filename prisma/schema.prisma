@@ -1,0 +1,253 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Clinic {
+  id                String   @id @default(uuid()) @db.Uuid
+  name              String?  @db.VarChar
+  timezone          String?  @db.VarChar
+  default_language  String?  @default("fr") @db.VarChar
+  phone             String?  @db.VarChar
+  address           String?  @db.Text
+  email             String?  @db.VarChar
+  website           String?  @db.VarChar
+  opening_hours     String?  @db.Text
+  emergency_message String?  @db.Text
+  onboarding_form_url String?  @db.Text
+  is_active         Boolean  @default(true)
+  created_at        DateTime @default(now()) @db.Timestamp
+
+  practitioners     Practitioner[]
+  whatsapp_configs  ClinicWhatsAppConfig[]
+  conversations     Conversation[]
+  patients          Patient[]
+  logs              SystemLog[]
+  analyses          ConversationAnalysis[]
+
+  users             ClinicUser[]
+  @@map("clinics")
+}
+
+model ClinicUser {
+  id        String   @id @default(uuid()) @db.Uuid
+  clinic_id String   @db.Uuid
+  username  String   @unique @db.VarChar
+  password  String   @db.VarChar
+  role      String   @default("ADMIN") @db.VarChar
+  created_at DateTime @default(now())
+
+  clinic    Clinic   @relation(fields: [clinic_id], references: [id])
+
+  @@map("clinic_users")
+}
+
+model Practitioner {
+  id                  String   @id @default(uuid()) @db.Uuid
+  clinic_id           String   @db.Uuid
+  first_name          String?  @db.VarChar
+  last_name           String?  @db.VarChar
+  specialty           String?  @db.VarChar
+  google_calendar_id  String   @db.VarChar
+  is_active           Boolean  @default(true)
+  created_at          DateTime @default(now()) @db.Timestamp
+
+  clinic              Clinic   @relation(fields: [clinic_id], references: [id])
+  calendar_integration PractitionerCalendarIntegration?
+  appointments        Appointment[]
+  treatments          PractitionerTreatment[]
+
+  @@map("practitioners")
+}
+
+model PractitionerCalendarIntegration {
+  id              String   @id @default(uuid()) @db.Uuid
+  practitioner_id String   @unique @db.Uuid
+  provider        String   @default("google") @db.VarChar
+  calendar_id     String   @db.VarChar
+  access_token    String   @db.Text
+  refresh_token   String   @db.Text
+  token_expiry    DateTime? @db.Timestamp
+  is_active       Boolean  @default(true)
+  created_at      DateTime @default(now()) @db.Timestamp
+
+  practitioner    Practitioner @relation(fields: [practitioner_id], references: [id])
+
+  @@map("practitioner_calendar_integrations")
+}
+
+model ClinicWhatsAppConfig {
+  id              String   @id @default(uuid()) @db.Uuid
+  clinic_id       String   @db.Uuid
+  phone_number    String   @unique @db.VarChar
+  verify_token    String   @db.VarChar
+  access_token    String   @db.Text
+  webhook_secret  String?  @db.VarChar
+  api_version     String   @default("v18.0") @db.VarChar
+  provider        String   @default("meta") @db.VarChar
+  is_active       Boolean  @default(true)
+  created_at      DateTime @default(now()) @db.Timestamp
+
+  clinic          Clinic   @relation(fields: [clinic_id], references: [id])
+
+  @@map("clinic_whatsapp_configs")
+}
+
+model Conversation {
+  id                String   @id @default(uuid()) @db.Uuid
+  clinic_id         String   @db.Uuid
+  user_phone        String   @db.VarChar
+  wa_id             String   @db.VarChar
+  current_state     String   @default("IDLE") @db.VarChar
+  detected_language String?  @default("fr") @db.VarChar
+  context_data      Json?
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  clinic            Clinic   @relation(fields: [clinic_id], references: [id])
+  messages          Message[]
+  logs              SystemLog[]
+  analyses          ConversationAnalysis[]
+
+  @@unique([clinic_id, wa_id])
+  @@map("conversations")
+}
+
+model Message {
+  id              String   @id @default(uuid()) @db.Uuid
+  conversation_id String   @db.Uuid
+  role            String   @db.VarChar
+  content         String   @db.Text
+  wamid           String?  @unique @db.VarChar
+  media_id        String?  @db.VarChar
+  media_type      String?  @db.VarChar
+  file_path       String?  @db.Text
+  created_at      DateTime @default(now())
+
+  conversation    Conversation @relation(fields: [conversation_id], references: [id])
+
+  @@map("messages")
+}
+
+model Patient {
+  id                        String   @id @default(uuid()) @db.Uuid
+  clinic_id                 String   @db.Uuid
+  first_name                String?  @db.VarChar
+  last_name                 String?  @db.VarChar
+  phone                     String   @db.VarChar
+  email                     String?  @db.VarChar
+  birth_date                DateTime? @db.Date
+  insurance_card_url        String? @db.Text
+  has_social_insurance      Boolean?
+  social_insurance_type     String?  @db.VarChar
+  beneficiary_number        String?  @db.VarChar
+  guarantee_number          String?  @db.VarChar
+  guarantee_document_path   String?  @db.Text
+  preferred_language        String?  @default("fr") @db.VarChar
+  created_at                DateTime @default(now()) @db.Timestamp
+
+  clinic          Clinic   @relation(fields: [clinic_id], references: [id])
+  appointments    Appointment[]
+
+  @@unique([clinic_id, phone])
+  @@map("patients")
+}
+
+model TreatmentType {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @db.VarChar
+  name_en     String?  @db.VarChar
+  description String?  @db.Text
+  duration_minutes Int  @default(30)
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now()) @db.Timestamp
+
+  practitioners PractitionerTreatment[]
+  appointments  Appointment[]
+
+  @@map("treatment_types")
+}
+
+model PractitionerTreatment {
+  id               String   @id @default(uuid()) @db.Uuid
+  practitioner_id  String   @db.Uuid
+  treatment_type_id String  @db.Uuid
+  is_active        Boolean  @default(true)
+  created_at       DateTime @default(now()) @db.Timestamp
+
+  practitioner     Practitioner  @relation(fields: [practitioner_id], references: [id])
+  treatment_type   TreatmentType @relation(fields: [treatment_type_id], references: [id])
+
+  @@unique([practitioner_id, treatment_type_id])
+  @@map("practitioner_treatments")
+}
+
+// ... (existing code)
+
+model SystemLog {
+  id              String   @id @default(uuid()) @db.Uuid
+  level           String   @db.VarChar // INFO, WARN, ERROR, DEBUG, CRITICAL
+  category        String   @db.VarChar // WHATSAPP, LLM, CONVERSATION, DATABASE, SYSTEM, SECURITY
+  action          String   @db.VarChar // Ex: MESSAGE_RECEIVED, INTENT_DETECTED, APPOINTMENT_CREATED
+  message         String   @db.Text
+  metadata        Json?    // Detailed payload, stack trace, tokens usage, etc.
+  
+  // Context links
+  clinic_id       String?  @db.Uuid
+  conversation_id String?  @db.Uuid
+  user_phone      String?  @db.VarChar // To track logs by user even without conversation
+  
+  created_at      DateTime @default(now()) @db.Timestamp
+
+  clinic          Clinic?       @relation(fields: [clinic_id], references: [id], onDelete: SetNull)
+  conversation    Conversation? @relation(fields: [conversation_id], references: [id], onDelete: SetNull)
+    
+  @@index([created_at])
+  @@index([level])
+  @@index([category])
+  @@index([clinic_id])
+  @@index([conversation_id])
+  @@index([user_phone])
+  @@map("system_logs")
+}
+
+model Appointment {
+// ... existing Appointment model ...
+  id                String   @id @default(uuid()) @db.Uuid
+  practitioner_id   String   @db.Uuid
+  patient_id        String   @db.Uuid
+  treatment_type_id String?  @db.Uuid
+  start_time        DateTime
+  end_time          DateTime
+  status            String   @default("CONFIRMED") @db.VarChar
+  google_event_id   String?  @db.VarChar
+  created_at        DateTime @default(now())
+
+  practitioner      Practitioner   @relation(fields: [practitioner_id], references: [id])
+  patient           Patient        @relation(fields: [patient_id], references: [id])
+  treatment_type    TreatmentType? @relation(fields: [treatment_type_id], references: [id])
+
+  @@map("appointments")
+}
+
+model ConversationAnalysis {
+  id                  String   @id @default(uuid()) @db.Uuid
+  conversation_id     String   @db.Uuid
+  clinic_id           String   @db.Uuid
+  message_range_start Int      @default(0)
+  message_range_end   Int
+  total_messages      Int
+  analysis_result     Json     // Stores the complete analysis JSON
+  created_at          DateTime @default(now()) @db.Timestamp
+
+  conversation        Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+  clinic              Clinic       @relation(fields: [clinic_id], references: [id], onDelete: Cascade)
+
+  @@index([conversation_id])
+  @@index([clinic_id])
+  @@index([created_at])
+  @@map("conversation_analyses")
+}

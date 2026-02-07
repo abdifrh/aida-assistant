@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Admin - AIDA Medical</title>
+    <link rel="stylesheet" href="css/dashboard.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+
+<body>
+    <!-- Login Page -->
+    <div id="loginPage" class="page active">
+        <div class="login-container">
+            <div class="login-card">
+                <div class="login-header">
+                    <h1>AIDA <span>Medical</span></h1>
+                    <p>Accès Administrateur Clinique</p>
+                </div>
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="username">Identifiant</label>
+                        <input type="text" id="username" name="username" required placeholder="Votre identifiant">
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Mot de passe</label>
+                        <input type="password" id="password" name="password" required placeholder="••••••••">
+                    </div>
+                    <button type="submit" class="btn-primary">S'identifier</button>
+                    <div id="loginError" class="error-message"></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard Page -->
+    <div id="dashboardPage" class="page">
+        <div class="dashboard-container">
+            <button id="mobileMenuToggle" class="mobile-menu-toggle"><i class="fas fa-bars"></i></button>
+
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <h2>AIDA <span>Medical</span></h2>
+                    <p id="clinicName">Chargement...</p>
+                </div>
+
+                <nav class="sidebar-nav">
+                    <a href="#" data-view="dashboard" class="nav-item active">
+                        <span class="icon"><i class="fas fa-chart-pie"></i></span>
+                        <span>Vue d'ensemble</span>
+                    </a>
+                    <a href="#" data-view="conversations" class="nav-item">
+                        <span class="icon"><i class="fas fa-comments"></i></span>
+                        <span>Conversations</span>
+                    </a>
+                    <a href="#" data-view="practitioners" class="nav-item">
+                        <span class="icon"><i class="fas fa-user-md"></i></span>
+                        <span>Médecins</span>
+                    </a>
+                    <a href="#" data-view="patients" class="nav-item">
+                        <span class="icon"><i class="fas fa-users"></i></span>
+                        <span>Patients</span>
+                    </a>
+                    <a href="#" data-view="appointments" class="nav-item">
+                        <span class="icon"><i class="fas fa-calendar-check"></i></span>
+                        <span>Rendez-vous</span>
+                    </a>
+                    <a href="#" data-view="statistics" class="nav-item">
+                        <span class="icon"><i class="fas fa-chart-bar"></i></span>
+                        <span>Statistiques</span>
+                    </a>
+                    <a href="#" data-view="treatments" class="nav-item">
+                        <span class="icon"><i class="fas fa-hand-holding-medical"></i></span>
+                        <span>Soins</span>
+                    </a>
+                    <a href="#" data-view="logs" class="nav-item">
+                        <span class="icon"><i class="fas fa-list-ul"></i></span>
+                        <span>Logs Système</span>
+                    </a>
+                    <a href="#" data-view="settings" class="nav-item">
+                        <span class="icon"><i class="fas fa-cog"></i></span>
+                        <span>Configuration</span>
+                    </a>
+                </nav>
+
+                <div class="sidebar-footer">
+                    <button id="logoutBtn" class="btn-secondary" style="width: 100%;">
+                        <i class="fas fa-sign-out-alt"></i> Déconnexion
+                    </button>
+                </div>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="main-content">
+
+                <!-- Dashboard View -->
+                <div id="dashboardView" class="view active animate-fade-in">
+                    <div class="view-header">
+                        <h1>Tableau de bord</h1>
+                    </div>
+
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-users"></i></div>
+                            <div class="stat-content">
+                                <h3 id="totalPatients">0</h3>
+                                <p>Patients</p>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-comment-dots"></i></div>
+                            <div class="stat-content">
+                                <h3 id="totalConversations">0</h3>
+                                <p>Conversations</p>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-calendar-alt"></i></div>
+                            <div class="stat-content">
+                                <h3 id="totalAppointments">0</h3>
+                                <p>Rendez-vous</p>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-user-check"></i></div>
+                            <div class="stat-content">
+                                <h3 id="activePractitioners">0</h3>
+                                <p>Médecins actifs</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="recent-section">
+                        <h2 style="margin-bottom: 1.5rem;"><i class="fas fa-history"></i> Activité récente</h2>
+                        <div id="recentConversations" class="data-list"></div>
+                    </div>
+                </div>
+
+                <!-- Conversations View -->
+                <div id="conversationsView" class="view animate-fade-in">
+                    <div class="view-header">
+                        <h1>Conversations WhatsApp</h1>
+                    </div>
+                    <div id="conversationsList" class="data-list"></div>
+                </div>
+
+                <!-- Practitioners View -->
+                <div id="practitionersView" class="view animate-fade-in">
+                    <div class="view-header">
+                        <h1>Équipe Médicale</h1>
+                        <button id="addPractitionerBtn" class="btn-primary"><i class="fas fa-plus"></i> Nouveau
+                            médecin</button>
+                    </div>
+                    <div id="practitionersList" class="data-list"></div>
+                </div>
+
+                <!-- Patients View -->
+                <div id="patientsView" class="view animate-fade-in">
+                    <div class="view-header">
+                        <h1>Base de données Patients</h1>
+                        <div style="position: relative; width: 300px;">
+                            <i class="fas fa-search"
+                                style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: var(--text-secondary);"></i>
+                            <input type="search" id="patientSearch" placeholder="Rechercher..."
+                                style="padding-left: 2.5rem;">
+                        </div>
+                    </div>
+                    <div id="patientsList" class="data-list"></div>
+                </div>
+
+                <!-- Appointments View -->
+                <div id="appointmentsView" class="view animate-fade-in">
+                    <div class="view-header">
+                        <h1>Agenda des RDV</h1>
+                        <div class="form-row" style="align-items: flex-end;">
+                            <div>
+                                <label style="font-size: 0.8rem; margin-bottom: 0.25rem; display: block;">Début</label>
+                                <input type="date" id="startDate">
+                            </div>
+                            <div>
+                                <label style="font-size: 0.8rem; margin-bottom: 0.25rem; display: block;">Fin</label>
+                                <input type="date" id="endDate">
+                            </div>
+                            <button id="filterAppointments" class="btn-secondary"><i class="fas fa-filter"></i></button>
+                        </div>
+                    </div>
+                    <div id="appointmentsList" class="data-list"></div>
+                </div>
+
+                <!-- Statistics View -->
+                <div id="statisticsView" class="view animate-fade-in">
+                    <div class="view-header">
+                        <h1>Statistiques Détaillées</h1>
+                        <div class="form-row" style="align-items: flex-end;">
+                            <div>
+                                <label style="font-size: 0.8rem; margin-bottom: 0.25rem; display: block;">Début</label>
+                                <input type="date" id="statsStartDate">
+                            </div>
+                            <div>
+                                <label style="font-size: 0.8rem; margin-bottom: 0.25rem; display: block;">Fin</label>
+                                <input type="date" id="statsEndDate">
+                            </div>
+                            <button id="refreshStats" class="btn-primary"><i class="fas fa-sync-alt"></i> Actualiser</button>
+                        </div>
+                    </div>
+
+                    <!-- Overview Cards -->
+                    <div class="stats-grid" style="margin-bottom: 2rem;">
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-comments"></i></div>
+                            <div class="stat-content">
+                                <p class="stat-label">Conversations</p>
+                                <p class="stat-value" id="statsConversationsCount">-</p>
+                                <small id="statsRecentConversations" style="color: var(--text-secondary);">-</small>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-calendar-check"></i></div>
+                            <div class="stat-content">
+                                <p class="stat-label">Rendez-vous</p>
+                                <p class="stat-value" id="statsAppointmentsCount">-</p>
+                                <small id="statsRecentAppointments" style="color: var(--text-secondary);">-</small>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-chart-line"></i></div>
+                            <div class="stat-content">
+                                <p class="stat-label">Taux Conversion</p>
+                                <p class="stat-value" id="statsConversionRate">-</p>
+                                <small style="color: var(--text-secondary);">Conv. → RDV</small>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas fa-star"></i></div>
+                            <div class="stat-content">
+                                <p class="stat-label">Satisfaction</p>
+                                <p class="stat-value" id="statsAvgSatisfaction">-</p>
+                                <small style="color: var(--text-secondary);">Moyenne</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Detailed Charts -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem;">
+                        <div class="data-item">
+                            <h3 style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                                <i class="fas fa-exchange-alt"></i> États Conversations
+                            </h3>
+                            <div id="adminConversationStatesChart"></div>
+                        </div>
+
+                        <div class="data-item">
+                            <h3 style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                                <i class="fas fa-calendar-alt"></i> Statuts RDV
+                            </h3>
+                            <div id="adminAppointmentStatusChart"></div>
+                        </div>
+
+                        <div class="data-item">
+                            <h3 style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                                <i class="fas fa-smile"></i> Sentiments
+                            </h3>
+                            <div id="adminSentimentChart"></div>
+                        </div>
+
+                        <div class="data-item">
+                            <h3 style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                                <i class="fas fa-check-circle"></i> Taux Complétion
+                            </h3>
+                            <div id="adminCompletionRateChart"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Treatments View -->
+                <div id="treatmentsView" class="view animate-fade-in">
+                    <div class="view-header">
+                        <h1>Catalogue des Soins</h1>
+                        <button id="addTreatmentBtn" class="btn-primary"><i class="fas fa-plus"></i> Nouveau
+                            soin</button>
+                    </div>
+                    <div id="treatmentsList" class="data-list"></div>
+                </div>
+
+                <!-- Logs View -->
+                <div id="logsView" class="view animate-fade-in">
+                    <div class="view-header" style="flex-wrap: wrap; gap: 1rem;">
+                        <h1>Logs du Système</h1>
+                        <div class="form-row" style="gap: 0.5rem;">
+                            <select id="logLevelFilter" style="width: auto;">
+                                <option value="">Tous les niveaux</option>
+                                <option value="INFO">INFO</option>
+                                <option value="WARN">WARN</option>
+                                <option value="ERROR">ERROR</option>
+                                <option value="DEBUG">DEBUG</option>
+                            </select>
+                            <select id="logCategoryFilter" style="width: auto;">
+                                <option value="">Toutes catégories</option>
+                                <option value="WHATSAPP">WhatsApp</option>
+                                <option value="CONVERSATION">Conversation</option>
+                                <option value="LLM">LLM</option>
+                                <option value="SYSTEM">Système</option>
+                                <option value="DATABASE">Base de données</option>
+                            </select>
+                            <button id="refreshLogs" class="btn-primary"><i class="fas fa-sync"></i></button>
+                            <button id="toggleAllLogs" class="btn-secondary">Tout ouvrir</button>
+                        </div>
+                    </div>
+                    <div id="logsList" class="data-list logs-container"></div>
+                    <div class="modal-actions"
+                        style="margin-top: 1.5rem; justify-content: center; align-items: center;">
+                        <button id="prevLogs" class="btn-secondary" disabled><i
+                                class="fas fa-chevron-left"></i></button>
+                        <span id="logsPageInfo" style="margin: 0 1rem; font-weight: 600;">Page 1</span>
+                        <button id="nextLogs" class="btn-secondary" disabled><i
+                                class="fas fa-chevron-right"></i></button>
+                    </div>
+                </div>
+
+                <!-- Settings View -->
+                <div id="settingsView" class="view animate-fade-in">
+                    <div class="view-header">
+                        <h1>Paramètres de la Clinique</h1>
+                    </div>
+                    <div class="data-item">
+                        <form id="clinicSettingsForm">
+                            <h2 class="form-section-title">Informations Générales</h2>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Nom de l'établissement</label>
+                                    <input type="text" id="clinicNameInput" name="name" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Téléphone de contact</label>
+                                    <input type="text" id="clinicPhone" name="phone">
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Email administratif</label>
+                                    <input type="email" id="clinicEmail" name="email">
+                                </div>
+                                <div class="form-group">
+                                    <label>Site Internet</label>
+                                    <input type="url" id="clinicWebsite" name="website">
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Adresse physique</label>
+                                <textarea id="clinicAddress" name="address" rows="2"></textarea>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Fuseau horaire</label>
+                                    <select id="clinicTimezone" name="timezone">
+                                        <option value="Europe/Paris">Europe/Paris (France)</option>
+                                        <option value="Europe/Zurich">Europe/Zurich (Suisse)</option>
+                                        <option value="Africa/Djibouti">Africa/Djibouti</option>
+                                        <option value="UTC">Indifférent (UTC)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Langue de l'IA Sophie</label>
+                                    <select id="clinicLanguage" name="default_language">
+                                        <option value="fr">Français</option>
+                                        <option value="en">English</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Horaires d'ouverture (Format JSON)</label>
+                                <textarea id="clinicOpeningHours" name="opening_hours" rows="6"
+                                    style="font-family: monospace;"></textarea>
+                                <button type="button" class="btn-secondary"
+                                    style="margin-top: 0.5rem; font-size: 0.8rem;" onclick="fillOpeningHoursTemplate()">
+                                    <i class="fas fa-magic"></i> Utiliser le modèle standard
+                                </button>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Message d'urgence (Affiché hors horaires)</label>
+                                <textarea id="clinicEmergencyMessage" name="emergency_message" rows="3"></textarea>
+                            </div>
+
+                            <div style="margin-top: 2rem; display: flex; justify-content: flex-end;">
+                                <button type="submit" class="btn-primary"><i class="fas fa-save"></i> Enregistrer les
+                                    modifications</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="practitionerModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="practitionerModalTitle">Médecin</h2>
+                <button class="modal-close"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="practitionerForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Prénom</label>
+                        <input type="text" id="practitionerFirstName" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Nom de famille</label>
+                        <input type="text" id="practitionerLastName" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Spécialité / Titre</label>
+                    <input type="text" id="practitionerSpecialty" placeholder="ex: Médecin-dentiste">
+                </div>
+                <div class="form-group">
+                    <label>ID Calendrier Google (Email ou ID)</label>
+                    <input type="text" id="practitionerCalendarId" required placeholder="ex: user@gmail.com">
+                </div>
+                <div class="form-group">
+                    <label>Soins pratiqués</label>
+                    <div id="practitionerTreatmentsCheckboxes" class="checkbox-grid"></div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary modal-close">Annuler</button>
+                    <button type="submit" class="btn-primary">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="conversationModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2>Historique de Conversation</h2>
+                <button class="modal-close"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="conversationDetails" class="conversation-details"></div>
+        </div>
+    </div>
+
+    <div id="treatmentModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="treatmentModalTitle">Type de Soin</h2>
+                <button class="modal-close"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="treatmentForm">
+                <div class="form-group">
+                    <label>Nom (FR)</label>
+                    <input type="text" id="treatmentName" required>
+                </div>
+                <div class="form-group">
+                    <label>Nom (EN)</label>
+                    <input type="text" id="treatmentNameEn">
+                </div>
+                <div class="form-group">
+                    <label>Description courte</label>
+                    <textarea id="treatmentDescription" rows="2"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Durée estimée (min)</label>
+                    <input type="number" id="treatmentDuration" value="30" min="5" step="5" required>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary modal-close">Annuler</button>
+                    <button type="submit" class="btn-primary">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="patientModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2>Profil Patient</h2>
+                <button class="modal-close"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="patientDetails" class="conversation-details">
+                <!-- Dynamically filled -->
+            </div>
+        </div>
+    </div>
+
+    <div id="practitionerModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2 id="practitionerModalName">Profil Praticien</h2>
+                <button class="modal-close"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="practitionerDetails" class="conversation-details">
+                <!-- Dynamically filled -->
+            </div>
+        </div>
+    </div>
+
+    <script src="js/dashboard.js"></script>
+</body>
+
+</html>

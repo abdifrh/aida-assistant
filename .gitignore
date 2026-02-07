@@ -1,0 +1,54 @@
+# Dependencies
+node_modules/
+package-lock.json.bak
+
+# Environment variables
+.env
+.env.local
+.env.production
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Generated files
+/src/generated/prisma
+build_output.txt
+test_*.txt
+*.tmp
+
+# Uploads (patient data - should not be in version control)
+uploads/images/*
+uploads/documents/*
+!uploads/images/.gitkeep
+!uploads/documents/.gitkeep
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Prisma
+prisma/.env
+
+# Temporary files
+temp/
+tmp/

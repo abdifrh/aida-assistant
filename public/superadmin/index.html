@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SuperAdmin - AIDA Medical</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+
+<body>
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="modal-overlay">
+        <div class="login-card">
+            <div class="brand" style="justify-content: center; font-size: 2rem;">
+                AIDA <span>SuperAdmin</span>
+            </div>
+            <p style="text-align: center; color: var(--text-secondary); margin-bottom: 2rem;">Accès sécurisé
+                administration globale</p>
+
+            <form id="loginForm">
+                <div class="form-group">
+                    <label class="form-label">Identifiant</label>
+                    <input type="text" id="username" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Mot de passe</label>
+                    <input type="password" id="password" class="form-input" required>
+                </div>
+                <div class="form-group" id="loginError"
+                    style="color: var(--danger-color); font-size: 0.875rem; display: none;">
+                    Identifiants invalides ou privilèges insuffisants.
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Se connecter</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- App Layout (Hidden by default) -->
+    <div id="appLayout" style="display: none; width: 100%; height: 100%; display: flex;">
+
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="brand">
+                AIDA <span>SuperAdmin</span>
+            </div>
+
+            <ul class="nav-links">
+                <li class="nav-item">
+                    <a href="#" class="nav-link active" data-section="overview">
+                        <i class="fas fa-chart-line"></i> Vue d'ensemble
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" data-section="clinics">
+                        <i class="fas fa-hospital"></i> Cliniques
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" data-section="practitioners">
+                        <i class="fas fa-user-md"></i> Médecins
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" data-section="patients">
+                        <i class="fas fa-users"></i> Patients
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" data-section="conversations">
+                        <i class="fas fa-comments"></i> Conversations
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" data-section="analyses">
+                        <i class="fas fa-brain"></i> Analyses IA
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" data-section="statistics">
+                        <i class="fas fa-chart-bar"></i> Statistiques
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" data-section="logs">
+                        <i class="fas fa-terminal"></i> Logs Système
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" data-section="appointments">
+                        <i class="fas fa-calendar-check"></i> Rendez-vous
+                    </a>
+                </li>
+            </ul>
+
+            <div class="user-profile">
+                <div class="avatar">SA</div>
+                <div style="flex: 1;">
+                    <div style="font-weight: 600; font-size: 0.9rem;" id="userNameDisplay">Admin</div>
+                    <div style="font-size: 0.75rem; color: var(--text-secondary);">Super Administrator</div>
+                </div>
+                <button id="logoutBtn" class="btn-outline" style="padding: 0.25rem 0.5rem; border: none;">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+
+            <!-- OVERVIEW SECTION -->
+            <section id="overview" class="section active animate-fade-in">
+                <div class="header">
+                    <h1>Vue d'ensemble</h1>
+                    <button class="btn btn-primary" onclick="refreshData()"><i class="fas fa-sync-alt"></i>
+                        Actualiser</button>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span>Total Cliniques</span>
+                            <i class="fas fa-hospital"></i>
+                        </div>
+                        <div class="stat-value" id="statClinics">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span>Total Médecins</span>
+                            <i class="fas fa-user-md"></i>
+                        </div>
+                        <div class="stat-value" id="statPractitioners">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span>Total Patients</span>
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="stat-value" id="statPatients">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span>Total RDV</span>
+                            <i class="fas fa-calendar-check"></i>
+                        </div>
+                        <div class="stat-value" id="statAppointments">-</div>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <div class="table-header">
+                        <h3><i class="fas fa-history"></i> Activité Récente</h3>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Horodatage</th>
+                                <th>Niveau</th>
+                                <th>Catégorie</th>
+                                <th>Message</th>
+                                <th>Clinique</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recentActivityTable">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- CLINICS SECTION -->
+            <section id="clinics" class="section animate-fade-in">
+                <div class="header">
+                    <h1>Gestion des Cliniques</h1>
+                    <button class="btn btn-primary" onclick="loadClinics()"><i class="fas fa-sync"></i>
+                        Actualiser</button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nom</th>
+                                <th>Contact</th>
+                                <th>Stats</th>
+                                <th>WhatsApp</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="clinicsTable">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- PRACTITIONERS SECTION -->
+            <section id="practitioners" class="section animate-fade-in">
+                <div class="header">
+                    <h1>Gestion des Médecins</h1>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nom</th>
+                                <th>Spécialité</th>
+                                <th>Clinique</th>
+                                <th>Statut</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="practitionersTable">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- PATIENTS SECTION -->
+            <section id="patients" class="section animate-fade-in">
+                <div class="header">
+                    <h1>Base Patients Globale</h1>
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <input type="text" id="patientSearch" placeholder="Rechercher..." class="form-input"
+                            style="width: 200px; padding: 0.5rem;">
+                        <select id="patientClinicFilter" class="form-input clinic-selector"
+                            style="width: 180px; padding: 0.5rem;">
+                            <option value="">Toutes les cliniques</option>
+                        </select>
+                        <button class="btn btn-primary" onclick="loadPatients()"><i class="fas fa-search"></i></button>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nom</th>
+                                <th>Téléphone</th>
+                                <th>Email</th>
+                                <th>Clinique</th>
+                                <th>Inscrit le</th>
+                                <th>Carte Vitale</th>
+                            </tr>
+                        </thead>
+                        <tbody id="patientsTable">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- CONVERSATIONS SECTION -->
+            <section id="conversations" class="section animate-fade-in">
+                <div class="header">
+                    <h1>Flux de Conversations</h1>
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <input type="text" id="convSearch" placeholder="Téléphone..." class="form-input"
+                            style="width: 150px; padding: 0.5rem;">
+                        <select id="convClinicFilter" class="form-input clinic-selector"
+                            style="width: 150px; padding: 0.5rem;">
+                            <option value="">Toutes cliniques</option>
+                        </select>
+                        <select id="convStatusFilter" class="form-input" style="width: 150px; padding: 0.5rem;">
+                            <option value="">Tous états</option>
+                            <option value="IDLE">IDLE</option>
+                            <option value="COLLECTING_PATIENT_DATA">COLLECTING_PATIENT_DATA</option>
+                            <option value="COLLECTING_APPOINTMENT_DATA">COLLECTING_APPOINTMENT_DATA</option>
+                            <option value="COMPLETED">COMPLETED</option>
+                            <option value="HANDOVER_HUMAN">HANDOVER_HUMAN</option>
+                        </select>
+                        <button class="btn btn-primary" onclick="loadConversations()"><i
+                                class="fas fa-search"></i></button>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Utilisateur</th>
+                                <th>Clinique</th>
+                                <th>État</th>
+                                <th>Dernier Message</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody id="conversationsTable">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- ANALYSES SECTION -->
+            <section id="analyses" class="section animate-fade-in">
+                <div class="header">
+                    <h1>Analyses IA des Conversations</h1>
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <select id="analysisClinicFilter" class="form-input clinic-selector"
+                            style="width: 180px; padding: 0.5rem;">
+                            <option value="">Toutes cliniques</option>
+                        </select>
+                        <select id="analysisSentimentFilter" class="form-input" style="width: 150px; padding: 0.5rem;">
+                            <option value="">Tous sentiments</option>
+                            <option value="POSITIVE">POSITIVE</option>
+                            <option value="NEUTRAL">NEUTRAL</option>
+                            <option value="NEGATIVE">NEGATIVE</option>
+                            <option value="FRUSTRATED">FRUSTRATED</option>
+                        </select>
+                        <button class="btn btn-primary" onclick="loadAnalyses()"><i class="fas fa-search"></i></button>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Conversation</th>
+                                <th>Clinique</th>
+                                <th>Patient</th>
+                                <th>Messages</th>
+                                <th>Sentiment</th>
+                                <th>Satisfaction</th>
+                                <th>État RDV</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="analysesTable">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- STATISTICS SECTION -->
+            <section id="statistics" class="section animate-fade-in">
+                <div class="header">
+                    <h1>Statistiques Détaillées</h1>
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <select id="statsClinicFilter" class="form-input clinic-selector"
+                            style="width: 180px; padding: 0.5rem;">
+                            <option value="">Toutes cliniques</option>
+                        </select>
+                        <input type="date" id="statsStartDate" class="form-input" style="width: 150px; padding: 0.5rem;">
+                        <input type="date" id="statsEndDate" class="form-input" style="width: 150px; padding: 0.5rem;">
+                        <button class="btn btn-primary" onclick="loadDetailedStats()"><i class="fas fa-sync-alt"></i> Actualiser</button>
+                    </div>
+                </div>
+
+                <!-- Overview Cards -->
+                <div class="stats-grid" style="margin-bottom: 2rem;">
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span>Total Conversations</span>
+                            <i class="fas fa-comments"></i>
+                        </div>
+                        <div class="stat-value" id="detailTotalConversations">-</div>
+                        <small id="detailRecentConversations" style="color: var(--text-secondary); font-size: 0.75rem;">-</small>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span>Total Rendez-vous</span>
+                            <i class="fas fa-calendar-check"></i>
+                        </div>
+                        <div class="stat-value" id="detailTotalAppointments">-</div>
+                        <small id="detailRecentAppointments" style="color: var(--text-secondary); font-size: 0.75rem;">-</small>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span>Taux de Conversion</span>
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div class="stat-value" id="detailConversionRate">-</div>
+                        <small style="color: var(--text-secondary); font-size: 0.75rem;">Conv. → RDV</small>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span>Satisfaction Moyenne</span>
+                            <i class="fas fa-star"></i>
+                        </div>
+                        <div class="stat-value" id="detailAvgSatisfaction">-</div>
+                        <small style="color: var(--text-secondary); font-size: 0.75rem;">Sur 10</small>
+                    </div>
+                </div>
+
+                <!-- Detailed Stats Grid -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem;">
+
+                    <!-- Conversation States -->
+                    <div style="background: rgba(255,255,255,0.03); padding: 1.5rem; border-radius: 0.5rem; border: 1px solid var(--border-color);">
+                        <h3 style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                            <i class="fas fa-exchange-alt"></i> États des Conversations
+                        </h3>
+                        <div id="conversationStatesChart" style="min-height: 200px;">
+                            <!-- Chart will be rendered here -->
+                        </div>
+                    </div>
+
+                    <!-- Appointment Status -->
+                    <div style="background: rgba(255,255,255,0.03); padding: 1.5rem; border-radius: 0.5rem; border: 1px solid var(--border-color);">
+                        <h3 style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                            <i class="fas fa-calendar-alt"></i> Statuts des Rendez-vous
+                        </h3>
+                        <div id="appointmentStatusChart" style="min-height: 200px;">
+                            <!-- Chart will be rendered here -->
+                        </div>
+                    </div>
+
+                    <!-- Sentiment Distribution -->
+                    <div style="background: rgba(255,255,255,0.03); padding: 1.5rem; border-radius: 0.5rem; border: 1px solid var(--border-color);">
+                        <h3 style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                            <i class="fas fa-smile"></i> Distribution des Sentiments
+                        </h3>
+                        <div id="sentimentChart" style="min-height: 200px;">
+                            <!-- Chart will be rendered here -->
+                        </div>
+                    </div>
+
+                    <!-- Completion Rates -->
+                    <div style="background: rgba(255,255,255,0.03); padding: 1.5rem; border-radius: 0.5rem; border: 1px solid var(--border-color);">
+                        <h3 style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                            <i class="fas fa-check-circle"></i> Taux de Complétion
+                        </h3>
+                        <div id="completionRateChart" style="min-height: 200px;">
+                            <!-- Chart will be rendered here -->
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
+            <!-- LOGS SECTION -->
+            <section id="logs" class="section animate-fade-in">
+                <div class="header">
+                    <h1>Logs Système Complets</h1>
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <select id="logClinicFilter" class="form-input clinic-selector"
+                            style="width: 150px; padding: 0.5rem;">
+                            <option value="">Toutes cliniques</option>
+                        </select>
+                        <select id="logLevelFilter" class="form-input" style="width: 150px; padding: 0.5rem;">
+                            <option value="">Tous niveaux</option>
+                            <option value="INFO">INFO</option>
+                            <option value="ERROR">ERROR</option>
+                            <option value="WARN">WARN</option>
+                        </select>
+                        <select id="logCategoryFilter" class="form-input" style="width: 150px; padding: 0.5rem;">
+                            <option value="">Toutes catégories</option>
+                            <option value="WHATSAPP">WhatsApp</option>
+                            <option value="CONVERSATION">Conversation</option>
+                            <option value="LLM">LLM</option>
+                            <option value="SYSTEM">Système</option>
+                        </select>
+                        <button class="btn btn-primary" onclick="loadLogs()"><i class="fas fa-filter"></i></button>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Level</th>
+                                <th>Category</th>
+                                <th>Details</th>
+                                <th>Context</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logsTable">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- APPOINTMENTS SECTION -->
+            <section id="appointments" class="section animate-fade-in">
+                <div class="header">
+                    <h1>Gestion des Rendez-vous</h1>
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <select id="apptClinicFilter" class="form-input clinic-selector"
+                            style="width: 150px; padding: 0.5rem;">
+                            <option value="">Toutes cliniques</option>
+                        </select>
+                        <select id="apptStatusFilter" class="form-input" style="width: 150px; padding: 0.5rem;">
+                            <option value="">Tous statuts</option>
+                            <option value="CONFIRMED">CONFIRMED</option>
+                            <option value="PENDING">PENDING</option>
+                            <option value="CANCELLED">CANCELLED</option>
+                        </select>
+                        <button class="btn btn-primary" onclick="loadAppointments()"><i
+                                class="fas fa-search"></i></button>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date & Heure</th>
+                                <th>Patient</th>
+                                <th>Médecin</th>
+                                <th>Clinique</th>
+                                <th>Statut</th>
+                            </tr>
+                        </thead>
+                        <tbody id="appointmentsTable">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Clinic Edit Modal -->
+    <div id="clinicModal" class="modal-overlay" style="display: none;">
+        <div class="login-card" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
+            <div class="header"
+                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                <h2>Configuration Clinique</h2>
+                <button class="btn-outline" onclick="closeClinicModal()"
+                    style="border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
+            </div>
+            <form id="clinicEditForm">
+                <input type="hidden" id="editClinicId">
+                <div class="form-row" style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                    <div style="flex: 1;">
+                        <label class="form-label">Nom</label>
+                        <input type="text" id="editClinicName" class="form-input" required>
+                    </div>
+                    <div style="flex: 1;">
+                        <label class="form-label">Email</label>
+                        <input type="email" id="editClinicEmail" class="form-input">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Adresse</label>
+                    <textarea id="editClinicAddress" class="form-input" rows="2"></textarea>
+                </div>
+
+                <div
+                    style="margin: 2rem 0 1rem; color: var(--accent-color); font-weight: 700; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
+                    Configuration Meta / WhatsApp Cloud API
+                </div>
+
+                <div class="form-row" style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                    <div style="flex: 1;">
+                        <label class="form-label">Phone Number ID</label>
+                        <input type="text" id="editWhatsappPhoneId" class="form-input">
+                    </div>
+                    <div style="flex: 1;">
+                        <label class="form-label">Verify Token</label>
+                        <input type="text" id="editWhatsappVerifyToken" class="form-input">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">System User Access Token (Permanent)</label>
+                    <textarea id="editWhatsappAccessToken" class="form-input" rows="3"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Webhook Secret</label>
+                    <input type="text" id="editWhatsappWebhookSecret" class="form-input">
+                </div>
+
+                <div class="modal-actions"
+                    style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem;">
+                    <button type="button" class="btn btn-outline" onclick="closeClinicModal()">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Enregistrer les modifications</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Practitioner Edit Modal -->
+    <div id="practitionerEditModal" class="modal-overlay" style="display: none;">
+        <div class="login-card" style="max-width: 600px; max-height: 90vh; overflow-y: auto;">
+            <div class="header"
+                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                <h2>Éditer Praticien</h2>
+                <button class="btn-outline" onclick="closePractitionerEditModal()"
+                    style="border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
+            </div>
+            <form id="practitionerEditForm">
+                <input type="hidden" id="editPracId">
+                <div class="form-row" style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                    <div style="flex: 1;">
+                        <label class="form-label">Prénom</label>
+                        <input type="text" id="editPracFirstName" class="form-input" required>
+                    </div>
+                    <div style="flex: 1;">
+                        <label class="form-label">Nom</label>
+                        <input type="text" id="editPracLastName" class="form-input" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Spécialité</label>
+                    <input type="text" id="editPracSpecialty" class="form-input">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Google Calendar ID</label>
+                    <input type="text" id="editPracCalendarId" class="form-input">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">
+                        <input type="checkbox" id="editPracActive"> Actif
+                    </label>
+                </div>
+
+                <div class="modal-actions"
+                    style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem;">
+                    <button type="button" class="btn btn-outline"
+                        onclick="closePractitionerEditModal()">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Enregistrer les modifications</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Patient Details Modal -->
+    <div id="patientModal" class="modal-overlay" style="display: none;">
+        <div class="login-card" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
+            <div class="header"
+                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                <h2>Profil Patient</h2>
+                <button class="btn-outline" onclick="closePatientModal()"
+                    style="border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
+            </div>
+            <div id="patientDetails">
+                <!-- Dynamically filled -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Conversation Details Modal -->
+    <div id="conversationModal" class="modal-overlay" style="display: none;">
+        <div class="login-card" style="max-width: 1200px; width: 95%; max-height: 90vh; overflow-y: auto;">
+            <div class="header"
+                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                <h2>Historique de Conversation</h2>
+                <button class="btn-outline" onclick="closeConversationModal()"
+                    style="border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                <div id="conversationDetails">
+                    <!-- Chat messages here -->
+                </div>
+                <div id="conversationAnalysis"
+                    style="border-left: 1px solid var(--border-color); padding-left: 1.5rem;">
+                    <h3 style="color: var(--accent-color); margin-bottom: 1rem;"><i class="fas fa-robot"></i> Analyse
+                        Sophie IA</h3>
+
+                    <!-- Message Range Selector -->
+                    <div style="background: rgba(255,255,255,0.03); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem; border: 1px solid var(--border-color);">
+                        <h4 style="margin-bottom: 0.75rem; font-size: 0.9rem;"><i class="fas fa-sliders-h"></i> Sélection de messages</h4>
+                        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                <label style="font-size: 0.85rem; min-width: 60px;">Depuis:</label>
+                                <input type="number" id="messageRangeStart" value="1" min="1" style="flex: 1; padding: 0.4rem; border-radius: 0.25rem; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); color: var(--text-primary);">
+                            </div>
+                            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                <label style="font-size: 0.85rem; min-width: 60px;">Jusqu'à:</label>
+                                <input type="number" id="messageRangeEnd" value="999" min="1" style="flex: 1; padding: 0.4rem; border-radius: 0.25rem; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); color: var(--text-primary);">
+                            </div>
+                            <button class="btn btn-primary" onclick="launchConversationAnalysis()" style="margin-top: 0.5rem;">
+                                <i class="fas fa-brain"></i> Lancer l'analyse complète
+                            </button>
+                            <button class="btn-outline" onclick="showAnalysisHistory()" style="margin-top: 0.5rem;">
+                                <i class="fas fa-history"></i> Voir l'historique
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="analysisContent">
+                        <div style="text-align: center; color: var(--text-secondary); padding: 2rem;">
+                            Sélectionnez la plage de messages et cliquez sur "Lancer l'analyse complète"
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Clinic Details Modal -->
+    <div id="clinicDetailsModal" class="modal-overlay" style="display: none;">
+        <div class="login-card" style="max-width: 900px; max-height: 90vh; overflow-y: auto;">
+            <div class="header"
+                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                <h2 id="detailsClinicName">Détails de la Clinique</h2>
+                <button class="btn-outline" onclick="closeClinicDetailsModal()"
+                    style="border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
+            </div>
+
+            <div id="clinicDetailsContent">
+                <!-- Dynamically filled -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Practitioner Details Modal -->
+    <div id="practitionerModal" class="modal-overlay" style="display: none;">
+        <div class="login-card" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
+            <div class="header"
+                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                <h2 id="detailsPractitionerName">Profil Praticien</h2>
+                <button class="btn-outline" onclick="closePractitionerModal()"
+                    style="border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
+            </div>
+            <div id="practitionerDetails">
+                <!-- Dynamically filled -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Analysis Detail Modal -->
+    <div id="analysisDetailModal" class="modal-overlay" style="display: none;">
+        <div class="login-card" style="max-width: 1000px; max-height: 90vh; overflow-y: auto;">
+            <div class="header"
+                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                <h2><i class="fas fa-brain"></i> Détail de l'Analyse</h2>
+                <button class="btn-outline" onclick="closeAnalysisDetailModal()"
+                    style="border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
+            </div>
+            <div id="analysisDetailContent">
+                <!-- Dynamically filled -->
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+
+</html>

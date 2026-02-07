@@ -1,0 +1,46 @@
+Proprietary License
+
+Copyright (c) 2026 AIDA Medical. All rights reserved.
+
+Sophie - AI Medical Secretary
+
+This software and associated documentation files (the "Software") are the
+proprietary property of AIDA Medical.
+
+RESTRICTIONS:
+
+1. The Software is provided for evaluation and development purposes only.
+
+2. You may NOT:
+   - Use the Software for commercial purposes without explicit written permission
+   - Distribute, sublicense, or sell copies of the Software
+   - Modify or create derivative works based on the Software for commercial use
+   - Remove or alter any copyright notices from the Software
+
+3. You MAY:
+   - Use the Software for personal, non-commercial evaluation
+   - Fork and modify for learning purposes (non-commercial)
+   - Report bugs and suggest improvements
+
+4. NO WARRANTY:
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   SOFTWARE.
+
+5. DATA PROTECTION:
+   - This Software processes sensitive medical data
+   - Users must comply with GDPR, HIPAA, and local data protection regulations
+   - AIDA Medical is not responsible for misuse of patient data
+
+For commercial licensing inquiries, please contact:
+Email: licensing@aida-medical.com
+Website: https://aida-medical.com
+
+---
+
+NOTE: If you wish to use an open-source license instead (MIT, GPL-3.0, Apache-2.0),
+simply replace this file with the appropriate open-source license text.

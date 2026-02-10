@@ -7,7 +7,7 @@ Sophie is natively designed as a **SaaS (Software as a Service)** solution. A si
 ## ðŸ—ï¸ Isolation Architecture
 
 Isolation is based on the `clinic_id` (UUID) field present in all key system tables:
-1.  **WhatsApp**: Each clinic links its own number via Meta APIs (Secret/Token).
+1.  **WhatsApp**: Each clinic links its own number via Twilio API.
 2.  **Calendar**: Google Calendar flows are specific to each practitioner within the clinic.
 3.  **Data**: Patients, appointments, and logs are filtered by this ID.
 
@@ -21,11 +21,15 @@ Create an entry in the `clinics` table.
 INSERT INTO clinics (name, timezone, address) VALUES ('My Clinic', 'Europe/Paris', '123 street..');
 ```
 
-### 2. WhatsApp Configuration
+### 2. WhatsApp Configuration (Twilio)
 Configure credentials in `clinic_whatsapp_configs`:
-- `phone_number_id`: Meta identifier.
-- `access_token`: Permanent system token.
+- `phone_number`: Twilio WhatsApp phone number.
 - `verify_token`: Webhook validation token.
+- `provider`: Set to 'twilio'.
+
+Global Twilio credentials are set in `.env`:
+- `TWILIO_ACCOUNT_SID`: Your Twilio Account SID.
+- `TWILIO_AUTH_TOKEN`: Your Twilio Auth Token.
 
 ---
 

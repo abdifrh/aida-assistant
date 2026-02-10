@@ -73,15 +73,15 @@ export class WhatsAppController {
                 }
             }
 
-            // Respond immediately to Meta to avoid retries
-            res.sendStatus(200);
+            // Respond immediately to Twilio with empty response (no "OK" text)
+            res.status(200).send('');
 
             // Process message in background
             await whatsAppService.handleIncomingMessage(req.body, clinicId as string);
         } catch (error) {
             console.error(`Error handling webhook for clinic ${clinicId}:`, error);
-            // If we haven't sent a response yet, send 200 to Meta to acknowledge receipt even on logic errors
-            if (!res.headersSent) res.sendStatus(200);
+            // If we haven't sent a response yet, send empty 200
+            if (!res.headersSent) res.status(200).send('');
         }
     }
 }

@@ -33,7 +33,7 @@
 - 🔄 **Machine à États Robuste** : Transitions fluides entre états
 - 🏥 **Architecture SaaS Multi-Tenant** : Isolation complète par clinique
 - 📸 **Gestion des Médias** : Téléchargement automatique d'images et PDFs
-- 🔐 **Sécurité Avancée** : Validation HMAC SHA-256, authentification JWT
+- 🔐 **Sécurité Avancée** : Validation webhook Twilio, authentification JWT
 - 📊 **Tableaux de Bord Complets** : Interfaces admin et super-admin
 - 🌐 **Synchronisation Temps Réel** : Intégration bidirectionnelle Google Calendar
 
@@ -43,7 +43,7 @@
 🖥️  Runtime          : Node.js v20+ avec TypeScript
 🗄️  Base de données  : PostgreSQL via Prisma ORM
 🧠  LLM             : Ollama (Qwen 2.5) - modèle aida-medical-v1
-💬  Interface client : WhatsApp Business Cloud API (Meta)
+💬  Interface client : Twilio WhatsApp API
 🎨  Dashboard       : HTML/CSS/JS natif + API Express
 🐳  Infrastructure  : Docker pour PostgreSQL et services
 ```
@@ -58,7 +58,7 @@ PROECTASSISTANT/
 │   │   ├── ConversationManager.ts    # ⚙️ FSM & orchestration
 │   │   ├── SophieService.ts          # 🧠 Intégration LLM
 │   │   ├── CalendarService.ts        # 📅 Sync Google Calendar
-│   │   ├── WhatsAppService.ts        # 💬 API WhatsApp Business
+│   │   ├── WhatsAppService.ts        # 💬 Twilio WhatsApp API
 │   │   ├── MediaService.ts           # 📸 Téléchargement médias
 │   │   ├── LLMService.ts             # 🤖 Communication Ollama
 │   │   ├── TreatmentService.ts       # 💉 Gestion des traitements
@@ -179,7 +179,7 @@ if (currentState === ConversationState.COLLECTING_PATIENT_DATA) {
 
 **Fichier**: `src/services/MediaService.ts`
 
-Le `MediaService` gère le téléchargement automatique depuis WhatsApp.
+Le `MediaService` gère le téléchargement automatique depuis Twilio WhatsApp.
 
 ### 3.2 Structure de Stockage
 
@@ -187,82 +187,61 @@ Le `MediaService` gère le téléchargement automatique depuis WhatsApp.
 uploads/
 ├── images/                    # Cartes d'assurance
 │   └── {clinic_id}/
-│       └── {timestamp}_{mediaId}.jpg
+│       └── {timestamp}_{randomId}.jpg
 │
 └── documents/                 # Documents de garantie
     └── {clinic_id}/
-        └── {timestamp}_{mediaId}.pdf
+        └── {timestamp}_{randomId}.pdf
 ```
 
-### 3.3 Code Complet : MediaService
+### 3.3 Code Complet : MediaService (Twilio)
 
 ```typescript
 export class MediaService {
+    private accountSid: string;
+    private authToken: string;
+
+    constructor() {
+        this.accountSid = process.env.TWILIO_ACCOUNT_SID || '';
+        this.authToken = process.env.TWILIO_AUTH_TOKEN || '';
+    }
+
     /**
-     * Télécharger et stocker une image depuis WhatsApp
+     * Télécharger et stocker une image depuis Twilio WhatsApp
      */
     async downloadAndStoreMedia(
-        mediaId: string,
+        mediaUrl: string,
         clinicId: string,
-        accessToken: string,
-        apiVersion: string = 'v18.0'
+        mimeType: string = 'image/jpeg'
     ): Promise<{ filePath: string; mimeType: string } | null> {
         try {
-            // Étape 1: Obtenir l'URL du média
-            const mediaUrlData = await this.getMediaUrl(
-                mediaId, accessToken, apiVersion
-            );
+            // Télécharger avec authentification Twilio
+            const fileBuffer = await this.downloadFile(mediaUrl);
 
-            if (!mediaUrlData) return null;
+            // Sauvegarder sur disque
+            const filePath = this.saveFileToDisk(fileBuffer, clinicId, mimeType);
 
-            // Étape 2: Télécharger le fichier
-            const fileBuffer = await this.downloadFile(
-                mediaUrlData.url, accessToken
-            );
-
-            // Étape 3: Sauvegarder sur disque
-            const filePath = this.saveFileToDisk(
-                fileBuffer, clinicId, mediaId, mediaUrlData.mimeType
-            );
-
-            await logService.info('WHATSAPP', 'MEDIA_STORED',
-                `Média stocké: ${mediaId}`,
+            await logService.info('TWILIO', 'MEDIA_STORED',
+                `Média stocké avec succès`,
                 { clinic_id: clinicId, metadata: { file_path: filePath } }
             );
 
-            return { filePath, mimeType: mediaUrlData.mimeType };
+            return { filePath, mimeType };
         } catch (error) {
-            await logService.error('WHATSAPP', 'MEDIA_DOWNLOAD_ERROR',
-                `Erreur téléchargement: ${mediaId}`, error,
+            await logService.error('TWILIO', 'MEDIA_DOWNLOAD_ERROR',
+                `Erreur téléchargement`, error,
                 { clinic_id: clinicId }
             );
             return null;
         }
     }
 
-    private async getMediaUrl(
-        mediaId: string,
-        accessToken: string,
-        apiVersion: string
-    ): Promise<{ url: string; mimeType: string } | null> {
-        const url = `https://graph.facebook.com/${apiVersion}/${mediaId}`;
-
+    private async downloadFile(url: string): Promise<Buffer> {
         const response = await axios.get(url, {
-            headers: { Authorization: `Bearer ${accessToken}` }
-        });
-
-        return {
-            url: response.data.url,
-            mimeType: response.data.mime_type || 'image/jpeg'
-        };
-    }
-
-    private async downloadFile(
-        url: string,
-        accessToken: string
-    ): Promise<Buffer> {
-        const response = await axios.get(url, {
-            headers: { Authorization: `Bearer ${accessToken}` },
+            auth: {
+                username: this.accountSid,
+                password: this.authToken
+            },
             responseType: 'arraybuffer'
         });
         return Buffer.from(response.data);
@@ -844,22 +823,16 @@ async createAppointment(
 }
 ```
 
-### 9.2 Appel API WhatsApp
+### 9.2 Appel API Twilio WhatsApp
 
 ```bash
-# Envoyer message via WhatsApp Business API
+# Envoyer message via Twilio WhatsApp API
 curl -X POST \
-  'https://graph.facebook.com/v18.0/123456789/messages' \
-  -H 'Authorization: Bearer YOUR_TOKEN' \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "messaging_product": "whatsapp",
-    "to": "33612345678",
-    "type": "text",
-    "text": {
-      "body": "Votre rendez-vous est confirmé !"
-    }
-  }'
+  'https://api.twilio.com/2010-04-01/Accounts/YOUR_ACCOUNT_SID/Messages.json' \
+  -u 'YOUR_ACCOUNT_SID:YOUR_AUTH_TOKEN' \
+  -d 'From=whatsapp:+14155238886' \
+  -d 'To=whatsapp:+33612345678' \
+  -d 'Body=Votre rendez-vous est confirmé !'
 ```
 
 ---

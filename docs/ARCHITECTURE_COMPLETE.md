@@ -1563,7 +1563,7 @@ TWILIO_AUTH_TOKEN="xxxxx"
 TWILIO_WHATSAPP_NUMBER="whatsapp:+14155238886"
 
 # Vapi (Vocal)
-VAPI_API_KEY="946a9ab4-xxxx"
+VAPI_API_KEY="your_vapi_api_key"
 VAPI_WEBHOOK_URL="https://your-domain.com/webhook/vapi/webhook"
 VAPI_WEBHOOK_SECRET="your-secure-webhook-secret"
 

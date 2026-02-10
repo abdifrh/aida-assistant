@@ -3,88 +3,59 @@ import fs from 'fs';
 import path from 'path';
 import { logService } from './LogService';
 
+/**
+ * Service pour gérer les médias via Twilio WhatsApp
+ * Media service for Twilio WhatsApp
+ */
 export class MediaService {
+    private accountSid: string;
+    private authToken: string;
+
+    constructor() {
+        this.accountSid = process.env.TWILIO_ACCOUNT_SID || '';
+        this.authToken = process.env.TWILIO_AUTH_TOKEN || '';
+    }
+
     /**
-     * Download and store media from WhatsApp
-     * Télécharger et stocker le média depuis WhatsApp
+     * Download and store media from Twilio WhatsApp
+     * Télécharger et stocker le média depuis Twilio WhatsApp
      */
     async downloadAndStoreMedia(
-        mediaId: string,
+        mediaUrl: string,
         clinicId: string,
-        accessToken: string,
-        apiVersion: string = 'v18.0'
+        mimeType: string = 'image/jpeg'
     ): Promise<{ filePath: string; mimeType: string } | null> {
         try {
-            // Get media URL from WhatsApp API
-            // Obtenir l'URL du média depuis l'API WhatsApp
-            const mediaUrlData = await this.getMediaUrl(mediaId, accessToken, apiVersion);
+            await logService.info('TWILIO', 'MEDIA_DOWNLOAD_START',
+                `Downloading media from Twilio`, { clinic_id: clinicId, metadata: { mediaUrl } });
 
-            if (!mediaUrlData) {
-                await logService.error('WHATSAPP', 'MEDIA_URL_FAILED',
-                    `Failed to get media URL for ${mediaId}`, null, { clinic_id: clinicId });
-                return null;
-            }
-
-            // Download the file
-            // Télécharger le fichier
-            const fileBuffer = await this.downloadFile(mediaUrlData.url, accessToken);
+            // Download the file with Twilio authentication
+            const fileBuffer = await this.downloadFile(mediaUrl);
 
             // Save to disk
-            // Sauvegarder sur le disque
-            const filePath = this.saveFileToDisk(fileBuffer, clinicId, mediaId, mediaUrlData.mimeType);
+            const filePath = this.saveFileToDisk(fileBuffer, clinicId, mimeType);
 
-            await logService.info('WHATSAPP', 'MEDIA_STORED',
-                `Media stored successfully: ${mediaId}`,
-                { clinic_id: clinicId, metadata: { file_path: filePath, mime_type: mediaUrlData.mimeType } });
+            await logService.info('TWILIO', 'MEDIA_STORED',
+                `Media stored successfully`,
+                { clinic_id: clinicId, metadata: { file_path: filePath, mime_type: mimeType } });
 
-            return { filePath, mimeType: mediaUrlData.mimeType };
+            return { filePath, mimeType };
         } catch (error) {
-            await logService.error('WHATSAPP', 'MEDIA_DOWNLOAD_ERROR',
-                `Error downloading media ${mediaId}`, error, { clinic_id: clinicId });
+            await logService.error('TWILIO', 'MEDIA_DOWNLOAD_ERROR',
+                `Error downloading media`, error, { clinic_id: clinicId });
             return null;
         }
     }
 
     /**
-     * Get media URL from WhatsApp API
-     * Obtenir l'URL du média depuis l'API WhatsApp
+     * Download file from Twilio URL with authentication
+     * Télécharger le fichier depuis l'URL Twilio avec authentification
      */
-    private async getMediaUrl(
-        mediaId: string,
-        accessToken: string,
-        apiVersion: string
-    ): Promise<{ url: string; mimeType: string } | null> {
-        try {
-            const url = `https://graph.facebook.com/${apiVersion}/${mediaId}`;
-
-            const response = await axios.get(url, {
-                headers: {
-                    Authorization: `Bearer ${accessToken}`,
-                },
-            });
-
-            return {
-                url: response.data.url,
-                mimeType: response.data.mime_type || 'image/jpeg',
-            };
-        } catch (error) {
-            if (axios.isAxiosError(error)) {
-                await logService.error('WHATSAPP', 'MEDIA_URL_REQUEST_FAILED',
-                    `Failed to get media URL from WhatsApp API`, error,
-                    { metadata: { media_id: mediaId, status: error.response?.status } });
-            }
-            return null;
-        }
-    }
-
-    /**
-     * Download file from URL
-     * Télécharger le fichier depuis l'URL
-     */
-    private async downloadFile(url: string, accessToken: string): Promise<Buffer> {
+    private async downloadFile(url: string): Promise<Buffer> {
         const response = await axios.get(url, {
-            headers: {
-                Authorization: `Bearer ${accessToken}`,
+            auth: {
+                username: this.accountSid,
+                password: this.authToken
             },
             responseType: 'arraybuffer',
         });
@@ -99,28 +70,23 @@ export class MediaService {
     private saveFileToDisk(
         buffer: Buffer,
         clinicId: string,
-        mediaId: string,
         mimeType: string
     ): string {
         // Ensure upload directory exists
-        // S'assurer que le dossier existe
         this.ensureUploadDir(clinicId);
 
         // Get file extension from MIME type
-        // Obtenir l'extension depuis le type MIME
         const extension = this.getExtensionFromMimeType(mimeType);
 
         // Create filename with timestamp
-        // Créer le nom de fichier avec timestamp
         const timestamp = Date.now();
-        const filename = `${timestamp}_${mediaId.substring(0, 20)}${extension}`;
+        const randomId = Math.random().toString(36).substring(7);
+        const filename = `${timestamp}_${randomId}${extension}`;
 
         // Full path
-        // Chemin complet
         const filePath = path.join(process.cwd(), 'uploads', 'images', clinicId, filename);
 
         // Write file
-        // Écrire le fichier
         fs.writeFileSync(filePath, buffer);
 
         return filePath;
@@ -150,45 +116,41 @@ export class MediaService {
             'image/webp': '.webp',
             'image/gif': '.gif',
             'application/pdf': '.pdf',
+            'audio/ogg': '.ogg',
+            'audio/mpeg': '.mp3',
+            'video/mp4': '.mp4',
         };
 
         return mimeToExt[mimeType] || '.jpg';
     }
 
     /**
-     * Download and store document (PDF) from WhatsApp
-     * Télécharger et stocker un document (PDF) depuis WhatsApp
+     * Download and store document (PDF) from Twilio WhatsApp
+     * Télécharger et stocker un document (PDF) depuis Twilio WhatsApp
      */
     async downloadAndStoreDocument(
-        mediaId: string,
+        mediaUrl: string,
         clinicId: string,
-        accessToken: string,
-        apiVersion: string = 'v18.0'
+        mimeType: string = 'application/pdf'
     ): Promise<{ filePath: string; mimeType: string } | null> {
         try {
-            // Get media URL from WhatsApp API
-            const mediaUrlData = await this.getMediaUrl(mediaId, accessToken, apiVersion);
-
-            if (!mediaUrlData) {
-                await logService.error('WHATSAPP', 'MEDIA_URL_FAILED',
-                    `Failed to get document URL for ${mediaId}`, null, { clinic_id: clinicId });
-                return null;
-            }
+            await logService.info('TWILIO', 'DOCUMENT_DOWNLOAD_START',
+                `Downloading document from Twilio`, { clinic_id: clinicId });
 
             // Download the file
-            const fileBuffer = await this.downloadFile(mediaUrlData.url, accessToken);
+            const fileBuffer = await this.downloadFile(mediaUrl);
 
             // Save to disk in documents folder
-            const filePath = this.saveDocumentToDisk(fileBuffer, clinicId, mediaId, mediaUrlData.mimeType);
+            const filePath = this.saveDocumentToDisk(fileBuffer, clinicId, mimeType);
 
-            await logService.info('WHATSAPP', 'DOCUMENT_STORED',
-                `Document stored successfully: ${mediaId}`,
-                { clinic_id: clinicId, metadata: { file_path: filePath, mime_type: mediaUrlData.mimeType } });
+            await logService.info('TWILIO', 'DOCUMENT_STORED',
+                `Document stored successfully`,
+                { clinic_id: clinicId, metadata: { file_path: filePath, mime_type: mimeType } });
 
-            return { filePath, mimeType: mediaUrlData.mimeType };
+            return { filePath, mimeType };
         } catch (error) {
-            await logService.error('WHATSAPP', 'DOCUMENT_DOWNLOAD_ERROR',
-                `Error downloading document ${mediaId}`, error, { clinic_id: clinicId });
+            await logService.error('TWILIO', 'DOCUMENT_DOWNLOAD_ERROR',
+                `Error downloading document`, error, { clinic_id: clinicId });
             return null;
         }
     }
@@ -200,7 +162,6 @@ export class MediaService {
     private saveDocumentToDisk(
         buffer: Buffer,
         clinicId: string,
-        mediaId: string,
         mimeType: string
     ): string {
         // Ensure upload directory exists for documents
@@ -211,7 +172,8 @@ export class MediaService {
 
         // Create filename with timestamp
         const timestamp = Date.now();
-        const filename = `${timestamp}_${mediaId.substring(0, 20)}${extension}`;
+        const randomId = Math.random().toString(36).substring(7);
+        const filename = `${timestamp}_${randomId}${extension}`;
 
         // Full path
         const filePath = path.join(process.cwd(), 'uploads', 'documents', clinicId, filename);

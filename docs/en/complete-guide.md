@@ -33,7 +33,7 @@
 - 🔄 **Robust State Machine**: Smooth transitions between states
 - 🏥 **Multi-Tenant SaaS Architecture**: Complete isolation by clinic
 - 📸 **Media Management**: Automatic download of images and PDFs
-- 🔐 **Advanced Security**: HMAC SHA-256 validation, JWT authentication
+- 🔐 **Advanced Security**: Twilio webhook validation, JWT authentication
 - 📊 **Complete Dashboards**: Admin and super-admin interfaces
 - 🌐 **Real-Time Synchronization**: Bidirectional Google Calendar integration
 
@@ -43,7 +43,7 @@
 🖥️  Runtime          : Node.js v20+ with TypeScript
 🗄️  Database         : PostgreSQL via Prisma ORM
 🧠  LLM              : Ollama (Qwen 2.5) - aida-medical-v1 model
-💬  Client Interface : WhatsApp Business Cloud API (Meta)
+💬  Client Interface : Twilio WhatsApp API
 🎨  Dashboard        : Native HTML/CSS/JS + Express API
 🐳  Infrastructure   : Docker for PostgreSQL and services
 ```
@@ -58,7 +58,7 @@ PROECTASSISTANT/
 │   │   ├── ConversationManager.ts    # ⚙️ FSM & orchestration
 │   │   ├── SophieService.ts          # 🧠 LLM integration
 │   │   ├── CalendarService.ts        # 📅 Google Calendar sync
-│   │   ├── WhatsAppService.ts        # 💬 WhatsApp Business API
+│   │   ├── WhatsAppService.ts        # 💬 Twilio WhatsApp API
 │   │   ├── MediaService.ts           # 📸 Media downloads
 │   │   ├── LLMService.ts             # 🤖 Ollama communication
 │   │   ├── TreatmentService.ts       # 💉 Treatment management
@@ -179,7 +179,7 @@ if (currentState === ConversationState.COLLECTING_PATIENT_DATA) {
 
 **File**: `src/services/MediaService.ts`
 
-The `MediaService` handles automatic downloads from WhatsApp.
+The `MediaService` handles automatic downloads from Twilio WhatsApp.
 
 ### 3.2 Storage Structure
 
@@ -187,82 +187,61 @@ The `MediaService` handles automatic downloads from WhatsApp.
 uploads/
 ├── images/                    # Insurance cards
 │   └── {clinic_id}/
-│       └── {timestamp}_{mediaId}.jpg
+│       └── {timestamp}_{randomId}.jpg
 │
 └── documents/                 # Guarantee documents
     └── {clinic_id}/
-        └── {timestamp}_{mediaId}.pdf
+        └── {timestamp}_{randomId}.pdf
 ```
 
-### 3.3 Complete Code: MediaService
+### 3.3 Complete Code: MediaService (Twilio)
 
 ```typescript
 export class MediaService {
+    private accountSid: string;
+    private authToken: string;
+
+    constructor() {
+        this.accountSid = process.env.TWILIO_ACCOUNT_SID || '';
+        this.authToken = process.env.TWILIO_AUTH_TOKEN || '';
+    }
+
     /**
-     * Download and store media from WhatsApp
+     * Download and store media from Twilio WhatsApp
      */
     async downloadAndStoreMedia(
-        mediaId: string,
+        mediaUrl: string,
         clinicId: string,
-        accessToken: string,
-        apiVersion: string = 'v18.0'
+        mimeType: string = 'image/jpeg'
     ): Promise<{ filePath: string; mimeType: string } | null> {
         try {
-            // Step 1: Get media URL
-            const mediaUrlData = await this.getMediaUrl(
-                mediaId, accessToken, apiVersion
-            );
+            // Download file with Twilio authentication
+            const fileBuffer = await this.downloadFile(mediaUrl);
 
-            if (!mediaUrlData) return null;
+            // Save to disk
+            const filePath = this.saveFileToDisk(fileBuffer, clinicId, mimeType);
 
-            // Step 2: Download file
-            const fileBuffer = await this.downloadFile(
-                mediaUrlData.url, accessToken
-            );
-
-            // Step 3: Save to disk
-            const filePath = this.saveFileToDisk(
-                fileBuffer, clinicId, mediaId, mediaUrlData.mimeType
-            );
-
-            await logService.info('WHATSAPP', 'MEDIA_STORED',
-                `Media stored: ${mediaId}`,
+            await logService.info('TWILIO', 'MEDIA_STORED',
+                `Media stored successfully`,
                 { clinic_id: clinicId, metadata: { file_path: filePath } }
             );
 
-            return { filePath, mimeType: mediaUrlData.mimeType };
+            return { filePath, mimeType };
         } catch (error) {
-            await logService.error('WHATSAPP', 'MEDIA_DOWNLOAD_ERROR',
-                `Download error: ${mediaId}`, error,
+            await logService.error('TWILIO', 'MEDIA_DOWNLOAD_ERROR',
+                `Download error`, error,
                 { clinic_id: clinicId }
             );
             return null;
         }
     }
 
-    private async getMediaUrl(
-        mediaId: string,
-        accessToken: string,
-        apiVersion: string
-    ): Promise<{ url: string; mimeType: string } | null> {
-        const url = `https://graph.facebook.com/${apiVersion}/${mediaId}`;
-
+    private async downloadFile(url: string): Promise<Buffer> {
         const response = await axios.get(url, {
-            headers: { Authorization: `Bearer ${accessToken}` }
-        });
-
-        return {
-            url: response.data.url,
-            mimeType: response.data.mime_type || 'image/jpeg'
-        };
-    }
-
-    private async downloadFile(
-        url: string,
-        accessToken: string
-    ): Promise<Buffer> {
-        const response = await axios.get(url, {
-            headers: { Authorization: `Bearer ${accessToken}` },
+            auth: {
+                username: this.accountSid,
+                password: this.authToken
+            },
             responseType: 'arraybuffer'
         });
         return Buffer.from(response.data);
@@ -844,22 +823,16 @@ async createAppointment(
 }
 ```
 
-### 9.2 WhatsApp API Call
+### 9.2 Twilio WhatsApp API Call
 
 ```bash
-# Send message via WhatsApp Business API
+# Send message via Twilio WhatsApp API
 curl -X POST \
-  'https://graph.facebook.com/v18.0/123456789/messages' \
-  -H 'Authorization: Bearer YOUR_TOKEN' \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "messaging_product": "whatsapp",
-    "to": "33612345678",
-    "type": "text",
-    "text": {
-      "body": "Your appointment is confirmed!"
-    }
-  }'
+  'https://api.twilio.com/2010-04-01/Accounts/YOUR_ACCOUNT_SID/Messages.json' \
+  -u 'YOUR_ACCOUNT_SID:YOUR_AUTH_TOKEN' \
+  -d 'From=whatsapp:+14155238886' \
+  -d 'To=whatsapp:+33612345678' \
+  -d 'Body=Your appointment is confirmed!'
 ```
 
 ---

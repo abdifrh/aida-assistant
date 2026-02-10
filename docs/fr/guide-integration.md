@@ -10,8 +10,8 @@
 
 1. [Configuration de l'environnement de développement](#1-configuration-de-lenvironnement-de-développement)
 2. [Installation pas à pas](#2-installation-pas-à-pas)
-3. [Intégration WhatsApp Business API](#3-intégration-whatsapp-business-api)
-4. [Implémentation MediaService](#4-implémentation-mediaservice)
+3. [Intégration Twilio WhatsApp](#3-intégration-twilio-whatsapp)
+4. [Implémentation MediaService (Twilio)](#4-implémentation-mediaservice-twilio)
 5. [Synchronisation Google Calendar](#5-synchronisation-google-calendar)
 6. [Configuration Ollama LLM](#6-configuration-ollama-llm)
 7. [Documentation complète des API](#7-documentation-complète-des-api)
@@ -197,6 +197,11 @@ LLM_API_URL="http://localhost:11434/api/generate"
 # JWT Secret pour authentification
 JWT_SECRET="votre-super-secret-jwt-key-change-in-production-2024"
 
+# Twilio WhatsApp
+TWILIO_ACCOUNT_SID="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+TWILIO_AUTH_TOKEN="votre-auth-token-twilio"
+TWILIO_PHONE_NUMBER="+14155238886"
+
 # Google OAuth2 pour intégration Calendar
 GOOGLE_CLIENT_ID="votre-client-id.apps.googleusercontent.com"
 GOOGLE_CLIENT_SECRET="votre-client-secret"
@@ -310,36 +315,44 @@ curl http://localhost:3000/health
 
 ---
 
-## 3. Intégration WhatsApp Business API
+## 3. Intégration Twilio WhatsApp
 
 ### 3.1 Vue d'ensemble
 
-Sophie utilise l'API WhatsApp Business Cloud de Meta pour recevoir et envoyer des messages. L'intégration comprend :
+Sophie utilise l'API WhatsApp de Twilio pour recevoir et envoyer des messages. L'intégration comprend :
 
 - **Webhooks** pour recevoir les messages entrants
-- **Validation HMAC SHA-256** pour la sécurité
-- **API Graph** pour envoyer des messages sortants
+- **Validation de signature Twilio** pour la sécurité (optionnel)
+- **API Twilio** pour envoyer des messages sortants
 
 ### 3.2 Configuration du webhook
 
-#### Création d'une application Meta
+#### Configuration Twilio
 
-1. Accéder à [Facebook for Developers](https://developers.facebook.com/)
-2. Créer une nouvelle application de type "Business"
-3. Ajouter le produit "WhatsApp"
-4. Obtenir le **Phone Number ID** et le **Access Token**
+1. Créer un compte sur [Twilio Console](https://console.twilio.com/)
+2. Activer WhatsApp Sandbox ou Business API
+3. Noter votre **Account SID** et **Auth Token**
 
-#### Configuration du webhook dans Meta
+#### Configuration du webhook dans Twilio
 
 **URL du webhook** : `https://votre-domaine.com/webhook/whatsapp/{clinicId}`
 
 **Étapes** :
 
-1. Dans la console Meta, accéder à WhatsApp > Configuration
-2. Cliquer sur "Configurer les webhooks"
-3. Entrer l'URL du webhook
-4. Entrer un **Verify Token** (choisir une chaîne aléatoire, ex: `SOPHIE_VERIFY_TOKEN_2026`)
-5. S'abonner aux événements : `messages`
+1. Dans la console Twilio, accéder à Messaging > WhatsApp
+2. Configurer les webhooks :
+   - **When a message comes in**: `https://votre-domaine.com/webhook/whatsapp/{clinicId}`
+   - **Status callback URL**: (optionnel) `https://votre-domaine.com/webhook/whatsapp/{clinicId}/status`
+
+#### Variables d'environnement
+
+Ajouter les credentials Twilio dans `.env` :
+
+```env
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=votre_auth_token_twilio
+TWILIO_PHONE_NUMBER=+14155238886
+```
 
 #### Enregistrement dans la base de données
 
@@ -351,20 +364,14 @@ INSERT INTO clinic_whatsapp_configs (
     clinic_id,
     phone_number,
     verify_token,
-    access_token,
-    webhook_secret,
-    api_version,
     provider,
     is_active
 ) VALUES (
     gen_random_uuid(),
     'your-clinic-uuid',
-    '+41123456789',
+    '+14155238886',
     'SOPHIE_VERIFY_TOKEN_2026',
-    'EAAxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-    'votre_webhook_secret_meta',
-    'v18.0',
-    'meta',
+    'twilio',
     true
 );
 ```
@@ -417,20 +424,9 @@ router.post('/:clinicId', (req, res) => whatsAppController.handleWebhook(req, re
 export default router;
 ```
 
-### 3.4 Validation HMAC SHA-256
+### 3.4 Validation de signature Twilio (optionnel)
 
-La validation de signature garantit que les requêtes proviennent bien de Meta.
-
-**Configuration dans `src/index.ts`** :
-
-```typescript
-// Middleware pour capturer le corps brut avant parsing JSON
-app.use(express.json({
-    verify: (req: any, res, buf) => {
-        req.rawBody = buf;
-    }
-}));
-```
+La validation de signature est optionnelle avec Twilio et peut être configurée par clinique.
 
 **Validation dans le contrôleur** (`src/controllers/WhatsAppController.ts`) :
 
@@ -448,283 +444,179 @@ async handleWebhook(req: Request, res: Response) {
             }
         });
 
-        // Vérification de sécurité : valider la signature si webhook_secret est configuré
-        if (config?.webhook_secret) {
-            if (!signature) {
-                console.error(`[SECURITY] Rejected unsigned webhook for clinic ${clinicId}`);
-                return res.sendStatus(403);
-            }
-
+        // Vérification de sécurité optionnelle
+        if (config?.webhook_secret && signature) {
             const crypto = await import('crypto');
             const hmac = crypto.createHmac('sha256', config.webhook_secret);
-            const rawBody = (req as any).rawBody;
-
-            // Si rawBody est manquant, utiliser JSON.stringify en repli (moins fiable)
-            const bodyToVerify = rawBody || JSON.stringify(req.body);
-            const digest = 'sha256=' + hmac.update(bodyToVerify).digest('hex');
+            const rawBody = (req as any).rawBody || JSON.stringify(req.body);
+            const digest = 'sha256=' + hmac.update(rawBody).digest('hex');
 
             if (signature !== digest) {
                 console.error(`[SECURITY] Invalid signature for clinic ${clinicId}`);
-                console.error(`Expected ${digest} but got ${signature}`);
                 return res.sendStatus(403);
             }
         }
 
-        // Répondre immédiatement à Meta pour éviter les retentatives
-        res.sendStatus(200);
+        // Répondre immédiatement à Twilio (réponse vide pour éviter "OK")
+        res.status(200).send('');
 
         // Traiter le message en arrière-plan
         await whatsAppService.handleIncomingMessage(req.body, clinicId as string);
     } catch (error) {
         console.error(`Error handling webhook for clinic ${clinicId}:`, error);
-        if (!res.headersSent) res.sendStatus(200);
+        if (!res.headersSent) res.status(200).send('');
     }
 }
 ```
 
-### 3.5 Structure de la charge utile (payload)
+### 3.5 Structure de la charge utile Twilio (payload)
 
 #### Message texte entrant
 
-```json
-{
-  "object": "whatsapp_business_account",
-  "entry": [
-    {
-      "id": "WHATSAPP_BUSINESS_ACCOUNT_ID",
-      "changes": [
-        {
-          "value": {
-            "messaging_product": "whatsapp",
-            "metadata": {
-              "display_phone_number": "41123456789",
-              "phone_number_id": "PHONE_NUMBER_ID"
-            },
-            "contacts": [
-              {
-                "profile": {
-                  "name": "John Doe"
-                },
-                "wa_id": "41987654321"
-              }
-            ],
-            "messages": [
-              {
-                "from": "41987654321",
-                "id": "wamid.XXX==",
-                "timestamp": "1706451234",
-                "text": {
-                  "body": "Bonjour, je voudrais prendre un rendez-vous"
-                },
-                "type": "text"
-              }
-            ]
-          },
-          "field": "messages"
-        }
-      ]
-    }
-  ]
-}
+```
+POST /webhook/whatsapp/{clinicId}
+Content-Type: application/x-www-form-urlencoded
+
+MessageSid=SM1234567890abcdef
+From=whatsapp:+41987654321
+To=whatsapp:+14155238886
+Body=Bonjour, je voudrais prendre un rendez-vous
+NumMedia=0
 ```
 
 #### Message avec image
 
-```json
-{
-  "messages": [
-    {
-      "from": "41987654321",
-      "id": "wamid.YYY==",
-      "timestamp": "1706451300",
-      "type": "image",
-      "image": {
-        "caption": "Voici ma carte d'assurance",
-        "mime_type": "image/jpeg",
-        "sha256": "abcd1234...",
-        "id": "IMAGE_ID"
-      }
-    }
-  ]
-}
+```
+POST /webhook/whatsapp/{clinicId}
+Content-Type: application/x-www-form-urlencoded
+
+MessageSid=MM1234567890abcdef
+From=whatsapp:+41987654321
+To=whatsapp:+14155238886
+Body=Voici ma carte d'assurance
+NumMedia=1
+MediaUrl0=https://api.twilio.com/2010-04-01/Accounts/ACxxx/Messages/MMxxx/Media/MExxx
+MediaContentType0=image/jpeg
 ```
 
 #### Message avec document (PDF)
 
-```json
-{
-  "messages": [
-    {
-      "from": "41987654321",
-      "id": "wamid.ZZZ==",
-      "timestamp": "1706451400",
-      "type": "document",
-      "document": {
-        "caption": "Document de garantie",
-        "filename": "garantie.pdf",
-        "mime_type": "application/pdf",
-        "sha256": "efgh5678...",
-        "id": "DOCUMENT_ID"
-      }
-    }
-  ]
-}
+```
+POST /webhook/whatsapp/{clinicId}
+Content-Type: application/x-www-form-urlencoded
+
+MessageSid=MM1234567890abcdef
+From=whatsapp:+41987654321
+To=whatsapp:+14155238886
+Body=Document de garantie
+NumMedia=1
+MediaUrl0=https://api.twilio.com/2010-04-01/Accounts/ACxxx/Messages/MMxxx/Media/MExxx
+MediaContentType0=application/pdf
 ```
 
-### 3.6 Envoi de messages
+### 3.6 Envoi de messages via Twilio
 
-**Fichier** : `src/services/WhatsAppService.ts`
+**Fichier** : `src/services/TwilioWhatsAppService.ts`
 
 ```typescript
-async sendMessage(to: string, message: string, clinicId: string): Promise<boolean> {
-    try {
-        // Récupérer la configuration WhatsApp de la clinique
-        const config = await prisma.clinicWhatsAppConfig.findFirst({
-            where: {
-                clinic_id: clinicId,
-                is_active: true
-            }
-        });
+import twilio from 'twilio';
 
-        if (!config) {
-            console.error(`No WhatsApp config found for clinic ${clinicId}`);
+class TwilioWhatsAppService {
+    private client: twilio.Twilio;
+
+    constructor() {
+        this.client = twilio(
+            process.env.TWILIO_ACCOUNT_SID,
+            process.env.TWILIO_AUTH_TOKEN
+        );
+    }
+
+    async sendMessage(to: string, from: string, body: string): Promise<boolean> {
+        try {
+            // Formater les numéros pour WhatsApp
+            const toWhatsApp = to.startsWith('whatsapp:') ? to : `whatsapp:${to}`;
+            const fromWhatsApp = from.startsWith('whatsapp:') ? from : `whatsapp:${from}`;
+
+            const message = await this.client.messages.create({
+                body: body,
+                from: fromWhatsApp,
+                to: toWhatsApp
+            });
+
+            console.log(`Message sent to ${to}: ${message.sid}`);
+            return true;
+        } catch (error) {
+            console.error('Error sending WhatsApp message via Twilio:', error);
             return false;
         }
+    }
 
-        // Extraire le Phone Number ID depuis phone_number
-        // Note: Dans une vraie implémentation, stocker phone_number_id séparément
-        const phoneNumberId = 'YOUR_PHONE_NUMBER_ID'; // À adapter
-
-        // Construire l'URL de l'API Graph
-        const url = `https://graph.facebook.com/${config.api_version}/${phoneNumberId}/messages`;
-
-        // Envoyer la requête
-        const response = await axios.post(
-            url,
-            {
-                messaging_product: 'whatsapp',
-                to: to,
-                type: 'text',
-                text: {
-                    body: message
-                }
-            },
-            {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${config.access_token}`
-                }
-            }
-        );
-
-        console.log(`Message sent to ${to}: ${response.data.messages[0].id}`);
-        return true;
-    } catch (error) {
-        console.error('Error sending WhatsApp message:', error);
-        return false;
+    // Parser le numéro WhatsApp (enlever le préfixe whatsapp:)
+    parseWhatsAppNumber(number: string): string {
+        return number.replace('whatsapp:', '');
     }
 }
+
+export const twilioWhatsAppService = new TwilioWhatsAppService();
 ```
 
 ---
 
-## 4. Implémentation MediaService
+## 4. Implémentation MediaService (Twilio)
 
-Le `MediaService` gère le téléchargement et le stockage des médias (images et documents) envoyés par les patients via WhatsApp.
+Le `MediaService` gère le téléchargement et le stockage des médias (images et documents) envoyés par les patients via WhatsApp Twilio.
 
 ### 4.1 Architecture du MediaService
 
 **Fichier** : `src/services/MediaService.ts`
 
-### 4.2 Téléchargement d'une image
+### 4.2 Téléchargement d'une image depuis Twilio
 
 ```typescript
 /**
- * Download and store media from WhatsApp
- * Télécharger et stocker le média depuis WhatsApp
+ * Download and store media from Twilio WhatsApp
+ * Télécharger et stocker le média depuis Twilio WhatsApp
  */
 async downloadAndStoreMedia(
-    mediaId: string,
+    mediaUrl: string,
     clinicId: string,
-    accessToken: string,
-    apiVersion: string = 'v18.0'
+    mimeType: string = 'image/jpeg'
 ): Promise<{ filePath: string; mimeType: string } | null> {
     try {
-        // 1. Obtenir l'URL du média depuis l'API WhatsApp
-        const mediaUrlData = await this.getMediaUrl(mediaId, accessToken, apiVersion);
+        await logService.info('TWILIO', 'MEDIA_DOWNLOAD_START',
+            `Downloading media from Twilio`, { clinic_id: clinicId, metadata: { mediaUrl } });
 
-        if (!mediaUrlData) {
-            await logService.error('WHATSAPP', 'MEDIA_URL_FAILED',
-                `Failed to get media URL for ${mediaId}`, null, { clinic_id: clinicId });
-            return null;
-        }
+        // Télécharger le fichier avec authentification Twilio
+        const fileBuffer = await this.downloadFile(mediaUrl);
 
-        // 2. Télécharger le fichier
-        const fileBuffer = await this.downloadFile(mediaUrlData.url, accessToken);
+        // Sauvegarder sur le disque
+        const filePath = this.saveFileToDisk(fileBuffer, clinicId, mimeType);
 
-        // 3. Sauvegarder sur le disque
-        const filePath = this.saveFileToDisk(fileBuffer, clinicId, mediaId, mediaUrlData.mimeType);
+        await logService.info('TWILIO', 'MEDIA_STORED',
+            `Media stored successfully`,
+            { clinic_id: clinicId, metadata: { file_path: filePath, mime_type: mimeType } });
 
-        await logService.info('WHATSAPP', 'MEDIA_STORED',
-            `Media stored successfully: ${mediaId}`,
-            { clinic_id: clinicId, metadata: { file_path: filePath, mime_type: mediaUrlData.mimeType } });
-
-        return { filePath, mimeType: mediaUrlData.mimeType };
+        return { filePath, mimeType };
     } catch (error) {
-        await logService.error('WHATSAPP', 'MEDIA_DOWNLOAD_ERROR',
-            `Error downloading media ${mediaId}`, error, { clinic_id: clinicId });
+        await logService.error('TWILIO', 'MEDIA_DOWNLOAD_ERROR',
+            `Error downloading media`, error, { clinic_id: clinicId });
         return null;
     }
 }
 ```
 
-### 4.3 Récupération de l'URL du média
+### 4.3 Téléchargement du fichier avec authentification Twilio
 
 ```typescript
 /**
- * Get media URL from WhatsApp API
- * Obtenir l'URL du média depuis l'API WhatsApp
+ * Download file from Twilio URL with Basic Auth
+ * Télécharger le fichier depuis l'URL Twilio avec authentification Basic
  */
-private async getMediaUrl(
-    mediaId: string,
-    accessToken: string,
-    apiVersion: string
-): Promise<{ url: string; mimeType: string } | null> {
-    try {
-        const url = `https://graph.facebook.com/${apiVersion}/${mediaId}`;
-
-        const response = await axios.get(url, {
-            headers: {
-                Authorization: `Bearer ${accessToken}`,
-            },
-        });
-
-        return {
-            url: response.data.url,
-            mimeType: response.data.mime_type || 'image/jpeg',
-        };
-    } catch (error) {
-        if (axios.isAxiosError(error)) {
-            await logService.error('WHATSAPP', 'MEDIA_URL_REQUEST_FAILED',
-                `Failed to get media URL from WhatsApp API`, error,
-                { metadata: { media_id: mediaId, status: error.response?.status } });
-        }
-        return null;
-    }
-}
-```
-
-### 4.4 Téléchargement du fichier
-
-```typescript
-/**
- * Download file from URL
- * Télécharger le fichier depuis l'URL
- */
-private async downloadFile(url: string, accessToken: string): Promise<Buffer> {
+private async downloadFile(url: string): Promise<Buffer> {
     const response = await axios.get(url, {
-        headers: {
-            Authorization: `Bearer ${accessToken}`,
+        auth: {
+            username: process.env.TWILIO_ACCOUNT_SID || '',
+            password: process.env.TWILIO_AUTH_TOKEN || ''
         },
         responseType: 'arraybuffer',
     });
@@ -787,43 +679,36 @@ private getExtensionFromMimeType(mimeType: string): string {
 }
 ```
 
-### 4.7 Téléchargement de documents (PDF)
+### 4.7 Téléchargement de documents (PDF) depuis Twilio
 
 ```typescript
 /**
- * Download and store document (PDF) from WhatsApp
- * Télécharger et stocker un document (PDF) depuis WhatsApp
+ * Download and store document (PDF) from Twilio WhatsApp
+ * Télécharger et stocker un document (PDF) depuis Twilio WhatsApp
  */
 async downloadAndStoreDocument(
-    mediaId: string,
+    mediaUrl: string,
     clinicId: string,
-    accessToken: string,
-    apiVersion: string = 'v18.0'
+    mimeType: string = 'application/pdf'
 ): Promise<{ filePath: string; mimeType: string } | null> {
     try {
-        // Obtenir l'URL du média
-        const mediaUrlData = await this.getMediaUrl(mediaId, accessToken, apiVersion);
+        await logService.info('TWILIO', 'DOCUMENT_DOWNLOAD_START',
+            `Downloading document from Twilio`, { clinic_id: clinicId });
 
-        if (!mediaUrlData) {
-            await logService.error('WHATSAPP', 'MEDIA_URL_FAILED',
-                `Failed to get document URL for ${mediaId}`, null, { clinic_id: clinicId });
-            return null;
-        }
-
-        // Télécharger le fichier
-        const fileBuffer = await this.downloadFile(mediaUrlData.url, accessToken);
+        // Télécharger le fichier avec authentification Twilio
+        const fileBuffer = await this.downloadFile(mediaUrl);
 
         // Sauvegarder dans le dossier documents
-        const filePath = this.saveDocumentToDisk(fileBuffer, clinicId, mediaId, mediaUrlData.mimeType);
+        const filePath = this.saveDocumentToDisk(fileBuffer, clinicId, mimeType);
 
-        await logService.info('WHATSAPP', 'DOCUMENT_STORED',
-            `Document stored successfully: ${mediaId}`,
-            { clinic_id: clinicId, metadata: { file_path: filePath, mime_type: mediaUrlData.mimeType } });
+        await logService.info('TWILIO', 'DOCUMENT_STORED',
+            `Document stored successfully`,
+            { clinic_id: clinicId, metadata: { file_path: filePath, mime_type: mimeType } });
 
-        return { filePath, mimeType: mediaUrlData.mimeType };
+        return { filePath, mimeType };
     } catch (error) {
-        await logService.error('WHATSAPP', 'DOCUMENT_DOWNLOAD_ERROR',
-            `Error downloading document ${mediaId}`, error, { clinic_id: clinicId });
+        await logService.error('TWILIO', 'DOCUMENT_DOWNLOAD_ERROR',
+            `Error downloading document`, error, { clinic_id: clinicId });
         return null;
     }
 }
@@ -847,18 +732,17 @@ uploads/
     └── ...
 ```
 
-### 4.9 Flux de téléchargement complet
+### 4.9 Flux de téléchargement complet (Twilio)
 
 ```mermaid
 sequenceDiagram
-    Patient->>WhatsApp API: Envoie image/document
-    WhatsApp API->>Sophie Webhook: POST /webhook/whatsapp/{clinicId}
+    Patient->>WhatsApp: Envoie image/document
+    WhatsApp->>Twilio: Reçoit média
+    Twilio->>Sophie Webhook: POST /webhook/whatsapp/{clinicId} (avec MediaUrl0)
     Sophie Webhook->>WhatsAppService: handleIncomingMessage()
-    WhatsAppService->>MediaService: downloadAndStoreMedia()
-    MediaService->>WhatsApp API: GET /{mediaId} (obtenir URL)
-    WhatsApp API-->>MediaService: Retourne URL temporaire
-    MediaService->>WhatsApp API: GET {url} (télécharger fichier)
-    WhatsApp API-->>MediaService: Retourne Buffer
+    WhatsAppService->>MediaService: downloadAndStoreMedia(mediaUrl)
+    MediaService->>Twilio API: GET MediaUrl0 (Basic Auth)
+    Twilio API-->>MediaService: Retourne Buffer
     MediaService->>File System: Sauvegarde fichier
     MediaService-->>WhatsAppService: Retourne filePath
     WhatsAppService->>Database: Enregistre message avec file_path
@@ -1992,24 +1876,28 @@ Voir le fichier `prisma/schema.prisma` pour le schéma complet avec tous les cha
 ```env
 # ===== SERVEUR =====
 PORT=3000
+NODE_ENV=production
 
 # ===== BASE DE DONNÉES =====
 DATABASE_URL="postgresql://postgres:postgres123@localhost:5432/medical_assistant?schema=public"
 
 # ===== LLM (OLLAMA) =====
 LLM_API_URL="http://localhost:11434/api/generate"
+LLM_MODEL_NAME="sophie"
 
 # ===== SÉCURITÉ =====
 # Générer avec : node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 JWT_SECRET="votre-super-secret-jwt-key-change-in-production-2024-abcd1234"
 
+# ===== TWILIO WHATSAPP =====
+TWILIO_ACCOUNT_SID="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+TWILIO_AUTH_TOKEN="votre-auth-token-twilio"
+TWILIO_PHONE_NUMBER="+14155238886"
+
 # ===== GOOGLE OAUTH2 (CALENDAR) =====
 GOOGLE_CLIENT_ID="160111944168-xxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com"
 GOOGLE_CLIENT_SECRET="GOCSPX-xxxxxxxxxxxxxxxxxxxxxxxx"
 GOOGLE_REDIRECT_URI="http://localhost:3000/oauth/callback"
-
-# ===== WHATSAPP (Configuré par clinique en BDD, pas ici) =====
-# Les tokens WhatsApp sont stockés dans clinic_whatsapp_configs
 
 # ===== NGROK (Développement) =====
 # Pour exposer le serveur local à Internet

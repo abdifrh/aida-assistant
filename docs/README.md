@@ -14,7 +14,7 @@ Welcome to the complete documentation for **Sophie**, your AI Medical Assistant 
 
 ### Quick Links
 - [Installation Steps](en/complete-guide.md#installation--setup)
-- [WhatsApp Integration](en/integration-guide.md#whatsapp-business-api-integration)
+- [Twilio WhatsApp Integration](en/integration-guide.md#twilio-whatsapp-integration)
 - [Google Calendar Setup](en/integration-guide.md#google-calendar-synchronization)
 - [Admin Dashboard Guide](en/complete-guide.md#admin-dashboard-features)
 - [API Reference](en/integration-guide.md#api-endpoints)
@@ -31,7 +31,7 @@ Welcome to the complete documentation for **Sophie**, your AI Medical Assistant 
 
 ### Liens Rapides
 - [Étapes d'installation](fr/guide-complet.md#installation-et-configuration)
-- [Intégration WhatsApp](fr/guide-integration.md#intégration-whatsapp-business-api)
+- [Intégration Twilio WhatsApp](fr/guide-integration.md#intégration-twilio-whatsapp)
 - [Configuration Google Calendar](fr/guide-integration.md#synchronisation-google-calendar)
 - [Guide Dashboard Admin](fr/guide-complet.md#fonctionnalités-du-dashboard-admin)
 - [Référence API](fr/guide-integration.md#points-dapi)
@@ -64,19 +64,21 @@ Welcome to the complete documentation for **Sophie**, your AI Medical Assistant 
                         │
                         ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                  Meta WhatsApp API                           │
-│              (Cloud API Webhooks)                            │
+│                  Twilio WhatsApp API                         │
+│                 (Webhooks & Messaging)                       │
 └───────────────────────┬─────────────────────────────────────┘
                         │
                         ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                    Sophie Backend                            │
 │  ┌──────────────────────────────────────────────────────┐   │
-│  │  WhatsAppService → MediaService                       │   │
+│  │  WhatsAppService → TwilioWhatsAppService              │   │
+│  │         ↓                                             │   │
+│  │  MediaService (Twilio Auth)                           │   │
 │  │         ↓                                             │   │
 │  │  ConversationManager (FSM)                            │   │
 │  │         ↓                                             │   │
-│  │  LLMService → Ollama (Qwen 2.5)                       │   │
+│  │  LLMService → Ollama (Qwen 2.5 / Sophie)              │   │
 │  │         ↓                                             │   │
 │  │  CalendarService → Google Calendar API                │   │
 │  └──────────────────────────────────────────────────────┘   │

@@ -17,7 +17,7 @@
 - **🔄 Robust State Machine**: Smooth transitions between booking, modification, cancellation, and automatic patient data collection
 - **🏥 Multi-Tenant SaaS**: Isolated architecture per clinic with specific settings (timezones, opening hours, treatments)
 - **📸 Media Handling**: Automatic download and storage of insurance cards and guarantee documents (images & PDFs)
-- **🔐 Advanced Security**: HMAC SHA-256 webhook validation (Meta X-Hub-Signature) and emergency filtering
+- **🔐 Advanced Security**: Twilio webhook signature validation and emergency filtering
 - **📊 Admin Dashboards**: Complete management interface for clinics and super admins
 - **🌐 Real-Time Sync**: Native bidirectional integration with Google Calendar
 
@@ -28,7 +28,7 @@
 - **Runtime**: Node.js v20+ with TypeScript
 - **Database**: PostgreSQL via Prisma ORM
 - **LLM**: Ollama (Qwen 2.5) with optimized Modelfile for JSON entity extraction
-- **Client Interface**: WhatsApp Business Cloud API (Meta) with rawBody capture for HMAC validation
+- **Client Interface**: Twilio WhatsApp API with webhook signature validation
 - **Admin Dashboard**: Centralized management interface (Native HTML/CSS/JS + Express API)
 - **Super Admin**: Multi-clinic oversight with comprehensive analytics
 - **Infrastructure**: Docker for database and third-party services
@@ -192,24 +192,22 @@ if (currentContext.patient?.awaiting_social_insurance_response) {
 
 #### MediaService Architecture
 
-The `MediaService` handles automatic download and storage of WhatsApp media:
+The `MediaService` handles automatic download and storage of WhatsApp media via Twilio:
 
 ```typescript
 class MediaService {
-    // Download image (insurance cards)
+    // Download image (insurance cards) from Twilio
     async downloadAndStoreMedia(
-        mediaId: string,
+        mediaUrl: string,
         clinicId: string,
-        accessToken: string,
-        apiVersion: string
+        mimeType: string
     ): Promise<{ filePath: string; mimeType: string } | null>
 
-    // Download document (guarantee PDFs)
+    // Download document (guarantee PDFs) from Twilio
     async downloadAndStoreDocument(
-        mediaId: string,
+        mediaUrl: string,
         clinicId: string,
-        accessToken: string,
-        apiVersion: string
+        mimeType: string
     ): Promise<{ filePath: string; mimeType: string } | null>
 }
 ```
@@ -225,12 +223,11 @@ uploads/
         └── {timestamp}_{mediaId}.pdf
 ```
 
-**WhatsApp API Flow:**
-1. Receive webhook with `message.image.id` or `message.document.id`
-2. Call `GET https://graph.facebook.com/{version}/{media_id}` to get download URL
-3. Download file with access token
-4. Save to local filesystem
-5. Store path in database (`file_path` field in Message table)
+**Twilio WhatsApp API Flow:**
+1. Receive webhook with `MediaUrl0` and `MediaContentType0` fields
+2. Download file directly from Twilio URL with Basic Auth (Account SID + Auth Token)
+3. Save to local filesystem
+4. Store path in database (`file_path` field in Message table)
 
 ---
 
@@ -325,7 +322,7 @@ if (!isWithinBusinessHours(appointmentDate, clinic.opening_hours, timezone)) {
 - Node.js v20+
 - PostgreSQL
 - Ollama (for LLM)
-- Meta Developer Account (WhatsApp Cloud API)
+- Twilio Account (WhatsApp Business API)
 - Google Cloud Project (for Calendar API)
 
 #### Environment Configuration
@@ -373,28 +370,37 @@ npm run dev
 # Server runs on http://localhost:3000
 ```
 
-#### WhatsApp Setup
+#### Twilio WhatsApp Setup
 
-1. Create a Meta Developer App
-2. Configure WhatsApp Business API
-3. Set webhook URL: `https://your-domain.com/webhook/whatsapp/{clinicId}`
-4. Store credentials in database via Super Admin dashboard
+1. Create a Twilio account and enable WhatsApp Sandbox or Business API
+2. Configure webhook URL in Twilio Console: `https://your-domain.com/webhook/whatsapp/{clinicId}`
+3. Add Twilio credentials to `.env`:
+   ```env
+   TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxx
+   TWILIO_AUTH_TOKEN=your_auth_token
+   TWILIO_PHONE_NUMBER=+1234567890
+   ```
+4. Store clinic-specific settings in database via Super Admin dashboard
 
 ---
 
 ### Security Features
 
-#### Webhook Validation
+#### Webhook Validation (Twilio)
 ```typescript
-// HMAC SHA-256 signature verification
-const signature = req.headers['x-hub-signature-256'];
-const hash = crypto
-    .createHmac('sha256', appSecret)
-    .update(req.rawBody)
-    .digest('hex');
+// Twilio signature verification (optional, configured per clinic)
+const signature = req.headers['x-twilio-signature'];
+const twilioClient = require('twilio');
 
-if (signature !== `sha256=${hash}`) {
-    throw new Error('Invalid signature');
+const isValid = twilioClient.validateRequest(
+    authToken,
+    signature,
+    webhookUrl,
+    req.body
+);
+
+if (!isValid) {
+    throw new Error('Invalid Twilio signature');
 }
 ```
 
